@@ -1,0 +1,73 @@
+﻿Data Category,Description
+USUBJID,"Patient ID number randomly assigned to each patient prior to anonymizing the DICOM PHI tag (0010,0020)"
+AGE,"Patient age, years"
+SEX,"Patient sex, male or female"
+ETHNIC,ethnicity
+RACE,race
+BECOG,"ECOG Performance status scale - assessment of patient's functional status;GRADE	ECOG PERFORMANCE STATUS
+0= Fully active, able to carry on all pre-disease performance without restriction
+1=Restricted in physically strenuous activity but ambulatory and able to carry out work of a light or sedentary nature, e.g., light house work, office work
+2=Ambulatory and capable of all selfcare but unable to carry out any work activities; up and about more than 50% of waking hours
+3=Capable of only limited selfcare; confined to bed or chair more than 50% of waking hours
+4=Completely disabled; cannot carry on any selfcare; totally confined to bed or chair
+5=Dead"
+STRT1L1N,"1==locally advanced, 0==metastatic"
+HISTGRADE,histological grade 
+SMOKEPY,Number of packs smoked in a year
+SMOKESTAT,"Smoking status at first consultation:Current smoker, ex-smoker, non-smoker"
+PTUMSITE,Primary cancer site
+SUBSITE,Primary cancer subsite
+OTHSITE,other cancer site
+T,AJCC 7th edition T category 
+N,AJCC 7th edition N category 
+M ,AJCC 7th edition M category 
+STAGE,AJCC 7th edition stage groups (not specified for SARC021)
+CPCELL,Pathologic diagnosis/histology type
+PRADFL,"1==prior radiotherapy, 0==did not have prior radiotherapy"
+PCHEMFL,"1==prior chemotherapy, 0==did not have prior chemotherapy"
+BLVEF,baseline left ventricular ejection fraction
+HPV,Tumor HPV status determined by p16 IHC +/- HPV DNA by PCR. Blank cell indicates no data available.
+RTFL,"1==received radiation therapy, 0==did not receive radiation therapy"
+CHEMFL,"1==received concurrent chemotherapy, 1==did not receive concurrent chemotherapy"
+RTSTART,"Date of first radiotherapy fraction, with date offset applied"
+RTDOSE,Total RT dose delivered during radiotherapy.
+NFRAC,Number of RT fractions delivered.
+LASTFU,"Date of last follow-up, with date offset applied"
+T_OS,"Time from therapy start to either death or last follow-up, in years"
+E_OS,Binary indicator of vital status
+STAT_OS,Description of event
+T_PFS,"Time from therapy start to either progression or last follow-up, in years"
+E_PFS,Binary indicator of progression
+STAT_PFS,Description of event
+TTRESP,time-to-response
+RESPDUR,response duration
+LENFU,Duration of follow up from diagnosis to last contact date in years.
+DDATE,"Date of death, with date offset applied"
+DCAUSE,Cause of death (if applicable)
+LOCAL,Binary indicator of local relapse
+DLOCAL,"Date of local relapse (if applicable), with date offset applied."
+REG,Binary indicator of regional relapse 
+DREG,"Date of regional relapse (if applicable), with date offset applied."
+DIST,Binary indicator of distant metastasis 
+DDIST,"Date of distant metastasis (if applicable), with date offset applied."
+SECCANCER,Binary indicator of second cancer diagnosis
+DSECCANCER,"Date of second cancer diagnosis (if applicable), with date offset applied."
+RCHALLENGE,"training=training subset of RADCURE-challenge, test=heldout validation set of the RADCURE-challenge, 0=not in the RADCURE-challenge"
+CONTRAST,"Imaging enhanced by contrast agent (1=enhanced, 0=regular)"
+NUMLES,number of documented lesions
+NUMTRGT,number of documented target lesions
+NUMSITES,number of unique sites/orgrans in the body
+LUNGMETS,number of lung mets
+LIVMETS,number of liver mets
+TUMDIAM,tumor diameter measurements
+TUMLNKID,tumor labels
+VISITNUM,visit number
+VISITDAY,"day of visit on trial, in days"
+STUDYDAY,"day of assessment on trial, in days"
+NASSESS,number of assessments
+ORESPASS,overall response assessments
+NEFL,"FALSE==patient was evaluated at the first assessment, TRUE==patient was not evaluated at the first assessment"
+FRSTRESP,first assessment
+PRESP10,"percent of lesions that responded to treatment at the first assessment, given a 10% diameter change threshold"
+PRESP20,"percent of lesions that responded to treatment at the first assessment, given a 20% diameter change threshold"
+PDIFFS,percent difference in diameter from baseline to first follow-up for each target lesion
