@@ -34,19 +34,19 @@ Lesion-Level Aggregation Methods:
 
 # %% IMPORTS
 # Change working directory to be whatever directory this script is in
-#import os
-#os.chdir(os.path.dirname(__file__))
+import os
+os.chdir(os.path.dirname(__file__))
 import numpy as np, pandas as pd
 from itertools import combinations
 from sklearn.metrics.pairwise import cosine_similarity as cos_sim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-#from pymrmre import mrmr
-#from lifelines import CoxPHFitter
-#from lifelines.utils import concordance_index
+from pymrmre import mrmr
+from lifelines import CoxPHFitter
+from lifelines.utils import concordance_index
 from sklearn.utils import resample
-#from sksurv.linear_model import CoxnetSurvivalAnalysis
-#from sksurv.ensemble import RandomSurvivalForest
+from sksurv.linear_model import CoxnetSurvivalAnalysis
+from sksurv.ensemble import RandomSurvivalForest
 
 import Code.lesion_selection as fs
 
@@ -55,15 +55,32 @@ import Code.lesion_selection as fs
 # %% MISC.
 
 def calcNumMets(radiomics):
+    """
+    Calculate the number of lesions for each unique USUBJID in the radiomics dataset.
     
+    Parameters:
+    - radiomics (DataFrame): The radiomics dataset containing USUBJID information.
+    
+    Returns:
+    - numMet (DataFrame): DataFrame with two columns - 'USUBJID' and 'NumMets', representing the unique USUBJID and the corresponding number of metastases.
+    """
+
     ids,counts = np.unique(radiomics.USUBJID,return_counts=True)
     numMets = pd.DataFrame([ids,counts]).T
     numMets.columns = ['USUBJID','NumMets']
     
     return numMets
 
-def printRadiomicsReport(radiomics):
-    
+def printLesionReport(radiomics):
+    """
+    Prints a report based on the given radiomics data. Lists statistics on the number of institutions and patients per institution (where applicable), and the number of lesions per patient (where applicable).
+
+    Parameters:
+    - radiomics (DataFrame): PyRadiomics raw output.
+
+    Returns:
+    None
+    """
     patients,numLesions = np.unique(radiomics.USUBJID,return_counts=True)
     instCodes = [p[-6:-3] for p in patients]
     institutions,numPatients = np.unique(instCodes,return_counts=True)
@@ -93,20 +110,46 @@ def printRadiomicsReport(radiomics):
         print('Range: [{}, {}]'.format(np.min(numLesions),np.max(numLesions)))
         print('IQR: [{}, {}]'.format(np.percentile(numLesions,25),np.percentile(numLesions,75)))
         
-def randomSplit(radiomics,clinical,train_size = 0.7,tuneFlag = True):
-     
+def randomSplit(radiomics, clinical, train_size=0.8, tuneFlag=False):
+    """
+    Splits the data into train, tune, and test sets based on the given parameters.
+
+    Parameters:
+    - radiomics (DataFrame): The radiomics data.
+    - clinical (DataFrame): The clinical data.
+    - train_size (float): The proportion of data to be used for training. Default is 0.8.
+    - tuneFlag (bool): Flag indicating whether to include a tune set. Default is False.
+
+    Returns:
+    - train_ids (array): The IDs of the samples in the training set.
+    - test_ids (array): The IDs of the samples in the testing set.
+    - tune_ids (array): The IDs of the samples in the tuning set (optional, if tuneFlag == True).
+    """
     test_size = 1 - train_size
     ids_to_keep = np.intersect1d(clinical.USUBJID, np.unique(radiomics.USUBJID))
-    train_ids,test_ids = train_test_split(ids_to_keep,test_size=test_size,random_state=42)
-    
+    train_ids, test_ids = train_test_split(ids_to_keep, test_size=test_size, random_state=42)
+
     if tuneFlag:
         tune_size = 0.5
-        tune_ids,test_ids = train_test_split(ids_to_keep,test_size=tune_size,random_state=42)
-        return train_ids, tune_ids, test_ids
+        tune_ids, test_ids = train_test_split(ids_to_keep, test_size=tune_size, random_state=42)
+        return train_ids, test_ids, tune_ids
     else:
         return train_ids, test_ids
     
-def singleInstValidationSplit(radiomics,clinical,train_size = 0.7):
+def singleInstValidationSplit(radiomics, clinical, train_size=0.8):
+    """
+    Splits the data into training, testing, and validation sets based on the institution code. Validation set is the largest single institution.
+
+    Parameters:
+    - radiomics (DataFrame): The radiomics data.
+    - clinical (DataFrame): The clinical data.
+    - train_size (float): The proportion of data to be used for training (default is 0.8).
+
+    Returns:
+    - train_ids (array): The IDs of the samples in the training set.
+    - test_ids (array): The IDs of the samples in the testing set.
+    - validation_ids (array): The IDs of the samples in the validation set.
+    """
     
     test_size = 1 - train_size
     ids_to_keep = np.intersect1d(clinical.USUBJID, np.unique(radiomics.USUBJID))
@@ -126,7 +169,21 @@ def singleInstValidationSplit(radiomics,clinical,train_size = 0.7):
 
 # %% LESION AGGREGATION METHODS
 
-def calcUnweightedAverage(radiomics,clinical,outcome='OS',scaleFlag=False,numMetsFlag=True,multipleFlag=True):
+def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
+    """
+    Calculate the unweighted average of radiomics features for each subject.
+
+    Parameters:
+    - radiomics (DataFrame): DataFrame containing radiomics features.
+    - clinical (DataFrame): DataFrame containing clinical data.
+    - outcome (str, optional): Outcome variable. Defaults to 'OS'.
+    - scaleFlag (bool, optional): Flag indicating whether to scale the features. Defaults to False.
+    - numMetsFlag (bool, optional): Flag indicating whether to calculate the number of metastases. Defaults to True.
+    - multipleFlag (bool, optional): Flag indicating whether to include only subjects with multiple metastases. Defaults to True.
+
+    Returns:
+    - df_UnweightedAverage (DataFrame): Unweighted average of radiomics features and the specified outcome variable for each subject.
+    """
     
     startColInd = np.where(radiomics.columns.str.find('original')==0)[0][0]
     
@@ -153,7 +210,21 @@ def calcUnweightedAverage(radiomics,clinical,outcome='OS',scaleFlag=False,numMet
         
     return df_UnweightedAverage
 
-def calcVolumeWeightedAverage(radiomics,clinical,outcome='OS',scaleFlag=False,numMetsFlag=True,multipleFlag=True):
+def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
+    """
+    Calculates the volume-weighted average of radiomics features for each subject.
+
+    Parameters:
+    - radiomics (DataFrame): DataFrame containing radiomics features for each subject.
+    - clinical (DataFrame): DataFrame containing clinical data for each subject.
+    - outcome (str, optional): The outcome variable to include in the result DataFrame. Defaults to 'OS'.
+    - scaleFlag (bool, optional): Flag indicating whether to scale the features using StandardScaler. Defaults to False.
+    - numMetsFlag (bool, optional): Flag indicating whether to calculate the number of metastases for each subject. Defaults to True.
+    - multipleFlag (bool, optional): Flag indicating whether to include only subjects with more than one metastasis. Defaults to True.
+
+    Returns:
+    - df_WeightedAverage (DataFrame): Volume-weighted average of radiomics features and the specified outcome variable for each subject.
+    """
     
     startColInd = np.where(radiomics.columns.str.find('original')==0)[0][0]
     
@@ -183,7 +254,21 @@ def calcVolumeWeightedAverage(radiomics,clinical,outcome='OS',scaleFlag=False,nu
         
     return df_WeightedAverage
 
-def calcVolumeWeightedAverageNLargest(radiomics,clinical,numLesions=3,outcome='OS',scaleFlag=False,numMetsFlag=True):
+def calcVolumeWeightedAverageNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+    """
+    Calculate the volume-weighted average of the n largest lesions for each subject.
+
+    Parameters:
+    - radiomics (DataFrame): DataFrame containing radiomics data.
+    - clinical (DataFrame): DataFrame containing clinical data.
+    - numLesions (int): Number of largest lesions to consider (default is 3).
+    - outcome (str): Outcome variable to consider (default is 'OS').
+    - scaleFlag (bool): Flag indicating whether to scale the features (default is False).
+    - numMetsFlag (bool): Flag indicating whether to calculate the number of metastases (default is True).
+
+    Returns:
+    - df_VolWeightNLargest (DataFrame): Volume-weighted average of the N-largest lesions and the specified outcome variable for each subject.
+    """
     
     id_counts = radiomics['USUBJID'].value_counts()
     valid_ids = id_counts[id_counts >= numLesions].index
@@ -191,18 +276,32 @@ def calcVolumeWeightedAverageNLargest(radiomics,clinical,numLesions=3,outcome='O
     
     df_filtered = df_radiomics.groupby('USUBJID').apply(lambda group: group.nlargest(numLesions, 'original_shape_VoxelVolume')).reset_index(drop=True)
     
-    df_VolWeightNLargest = calcVolumeWeightedAverage(df_filtered,clinical,numMetsFlag=False)
+    df_VolWeightNLargest = calcVolumeWeightedAverage(df_filtered, clinical, numMetsFlag=False)
     
     if scaleFlag:
         scaledFeatures = StandardScaler().fit_transform(df_VolWeightNLargest.iloc[:,1:-2])
         df_VolWeightNLargest.iloc[:,1:-2] = scaledFeatures
     
     if numMetsFlag:
-        df_VolWeightNLargest.insert(1,"NumMets",calcNumMets(df_radiomics).NumMets,True)
+        df_VolWeightNLargest.insert(1, "NumMets", calcNumMets(df_radiomics).NumMets, True)
         
     return df_VolWeightNLargest
 
-def concatenateNLargest(radiomics,clinical,numLesions=3,outcome='OS',scaleFlag=False,numMetsFlag=True):
+def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+    """
+    Concatenates the largest lesions from radiomics data with clinical data.
+    
+    Parameters:
+    - radiomics (DataFrame): The radiomics data.
+    - clinical (DataFrame): The clinical data.
+    - numLesions (int, optional): The number of largest lesions to consider. Defaults to 3.
+    - outcome (str, optional): The outcome variable. Defaults to 'OS'.
+    - scaleFlag (bool, optional): Flag indicating whether to scale the features. Defaults to False.
+    - numMetsFlag (bool, optional): Flag indicating whether to calculate the number of metastases. Defaults to True.
+    
+    Returns:
+    - df_Concatenated (DataFrame): Concatenated radiomics data of the N-largest lesions and the specified outcome variable for each subject.
+    """
     
     startColInd = np.where(radiomics.columns.str.find('original')==0)[0][0]
     
@@ -238,8 +337,22 @@ def concatenateNLargest(radiomics,clinical,numLesions=3,outcome='OS',scaleFlag=F
     
     return df_Concatenated
 
-def calcCosineMetrics(radiomics,clinical,numLesions=2,outcome='OS',scaleFlag=False,numMetsFlag=True):
-        
+def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+    """
+    Calculate cosine similarity metrics for radiomics data.
+
+    Parameters:
+    - radiomics (DataFrame): DataFrame containing radiomics data.
+    - clinical (DataFrame): DataFrame containing clinical data.
+    - numLesions (int): Minimum number of lesions required for a patient to be included in the analysis. Default is 3.
+    - outcome (str): Outcome variable for survival analysis. Default is 'OS'.
+    - scaleFlag (bool): Flag indicating whether to scale the features. Default is False.
+    - numMetsFlag (bool): Flag indicating whether to calculate the number of metastases. Default is True.
+
+    Returns:
+    - df_CosineMetrics (DataFrame): Calculated cosine similarity metrics and the specified outcome variable for each subject.
+
+    """
     startColInd = np.where(radiomics.columns.str.find('original')==0)[0][0]
     
     id_counts = radiomics['USUBJID'].value_counts()
@@ -250,7 +363,7 @@ def calcCosineMetrics(radiomics,clinical,numLesions=2,outcome='OS',scaleFlag=Fal
     df_radiomics.insert(0, "USUBJID", radiomics.USUBJID[radiomics['USUBJID'].isin(valid_ids)], True)
 
     
-    # df_radiomics contains only those patients with 2+ lesions
+    # df_radiomics contains only those patients with 3+ lesions
     # for each patient, we need to isolate the features and scale them
     # then for each lesion-lesion combination, we calculate cos_sim using the scaled features
     avgTumorHetero = []
@@ -290,6 +403,19 @@ def calcCosineMetrics(radiomics,clinical,numLesions=2,outcome='OS',scaleFlag=Fal
 # %% FEATURE REDUCTION/SELECTION
 
 def varianceFilter(radiomics,varThresh=10,outcome='OS',returnColsFlag=True):
+    """
+    Filters the radiomics dataframe based on variance threshold.
+
+    Parameters:
+    - radiomics (DataFrame): The radiomics dataframe.
+    - varThresh (float): The variance threshold. Default is 10.
+    - outcome (str): The outcome variable. Default is 'OS'.
+    - returnColsFlag (bool): Flag to indicate whether to return the dropped columns. Default is True.
+
+    Returns:
+    - cols_to_drop (Index): The dropped columns (if returnColsFlag is True).
+    - radiomics (DataFrame): The filtered radiomics dataframe.
+    """
     
     var = radiomics.var()
     cols_to_drop = radiomics.columns[np.where(var>=varThresh)]
@@ -309,27 +435,53 @@ def varianceFilter(radiomics,varThresh=10,outcome='OS',returnColsFlag=True):
         return radiomics.drop(cols_to_drop,axis=1)
     
 
-def volumeFilter(radiomics,volThresh=0.1,outcome='OS',returnColsFlag=True):
+def volumeFilter(radiomics, volThresh=0.1, outcome='OS', returnColsFlag=True):
+    """
+    Filters the columns of a radiomics dataframe based on the correlation with the 'original_shape_VoxelVolume' column.
 
-    cor = radiomics.corr(method = 'spearman')['original_shape_VoxelVolume']
-    cols_to_drop = cor[abs(cor)>volThresh].index
-    
+    Parameters:
+    - radiomics (DataFrame): The radiomics dataframe.
+    - volThresh (float, optional): The correlation threshold. Columns with absolute correlation greater than volThresh will be dropped. Default is 0.1.
+    - outcome (str, optional): The outcome variable. Default is 'OS'.
+    - returnColsFlag (bool, optional): Flag indicating whether to return the dropped columns along with the filtered dataframe. Default is True.
+
+    Returns:
+    - cols_to_drop (Index): The dropped columns (if returnColsFlag is True).
+    - radiomics (DataFrame): The filtered radiomics dataframe.
+    """
+    cor = radiomics.corr(method='spearman')['original_shape_VoxelVolume']
+    cols_to_drop = cor[abs(cor) > volThresh].index
+
     if cols_to_drop.isin(['original_shape_VoxelVolume']).any():
         cols_to_drop = cols_to_drop.drop('original_shape_VoxelVolume')
-    
-    if cols_to_drop.isin(['T_'+outcome]).any():
-        cols_to_drop = cols_to_drop.drop('T_'+outcome)
-        
-    if cols_to_drop.isin(['E_'+outcome]).any():
-        cols_to_drop = cols_to_drop.drop('E_'+outcome)
-        
+
+    if cols_to_drop.isin(['T_' + outcome]).any():
+        cols_to_drop = cols_to_drop.drop('T_' + outcome)
+
+    if cols_to_drop.isin(['E_' + outcome]).any():
+        cols_to_drop = cols_to_drop.drop('E_' + outcome)
+
     if returnColsFlag:
-        return cols_to_drop,radiomics.drop(cols_to_drop,axis=1)
+        return cols_to_drop, radiomics.drop(cols_to_drop, axis=1)
     else:
-        return radiomics.drop(cols_to_drop,axis=1)
+        return radiomics.drop(cols_to_drop, axis=1)
 
 def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',returnColsFlag=False,scaleFlag=False):
+    """
+    Perform feature reduction on radiomics data.
 
+    Parameters:
+    - radiomics (DataFrame): The input radiomics data.
+    - varThresh (int): The variance threshold for feature selection (default: 10).
+    - volThresh (float): The volume threshold for feature selection (default: 0.1).
+    - outcome (str): The outcome variable for filtering (default: 'OS').
+    - returnColsFlag (bool): Flag indicating whether to return the selected columns (default: False).
+    - scaleFlag (bool): Flag indicating whether to scale the features (default: False).
+
+    Returns:
+    - df_volReduced (DataFrame): The reduced radiomics data.
+
+    """
     df_varReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
     df_volReduced = volumeFilter(df_varReduced,volThresh,outcome,returnColsFlag)
     
@@ -337,7 +489,7 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',returnCol
         scaledFeatures = StandardScaler().fit_transform(df_volReduced.iloc[:,1:-2])
         df_volReduced.iloc[:,1:-2] = scaledFeatures
 
-    return df_volReduced    
+    return df_volReduced
 
 def featureSelection(df,numFeatures=10,numMetsFlag=False,volFlag=False,scaleFlag=False):
     
