@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Nov 29 2023
+Created on Oct 29 2023
 Last updated Feb 16 2024
 
-@author: cgeady
+@author: caryn-geady
 """
 
 '''
@@ -24,7 +24,6 @@ Lesion Selection Methods:
 import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-# %% MISC
 
 def calcNumMets(radiomics):
     """
@@ -42,14 +41,11 @@ def calcNumMets(radiomics):
     numMets.columns = ['USUBJID','NumMets']
     
     return numMets
-
-
-# %% LESION SELECTION METHODS 
  
 # def selectPrimaryTumor (dataset-specific hypothesis)
 def selectPrimaryTumor(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
     """
-    Selects primary tumors from radiomics data based on specified criteria.
+    RADCURE-SPECIFIC: selects primary tumors from radiomics data and merges it with the clinical outcome.
 
     Parameters:
     - radiomics (DataFrame): DataFrame containing radiomics data.
@@ -85,7 +81,7 @@ def selectPrimaryTumor(radiomics, clinical, outcome='OS', scaleFlag=False, numMe
 
 def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
     """
-    Selects the smallest lesion based on radiomics data and clinical information.
+    Selects the smallest lesion based on radiomics data and merges it with the clinical outcome.
 
     Parameters:
     - radiomics (DataFrame): DataFrame containing radiomics data.
@@ -122,7 +118,7 @@ def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, num
         
 def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
     """
-    Selects the largest lesion based on radiomics data and clinical information.
+    Selects the largest lesion based on radiomics data and merges it with the clinical outcome.
 
     Parameters:
     - radiomics (DataFrame): DataFrame containing radiomics data.
@@ -160,7 +156,7 @@ def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numM
 # def selectLargestLungLesion (sarcoma-specific hypothesis)
 def selectLargestLungLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
     """
-    Selects the largest lung lesion from the radiomics data and merges it with the clinical data.
+    SARCOMA-SPECIFIC: selects the largest lung lesion from the radiomics data and merges it with the clinical outcome.
     
     Parameters:
     - radiomics (DataFrame): The radiomics data.
