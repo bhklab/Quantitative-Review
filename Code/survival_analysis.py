@@ -14,6 +14,7 @@ Models:
 - Random Survival Forest
 """
 
+import numpy as np
 from lifelines import CoxPHFitter
 from lifelines.utils import concordance_index
 from sklearn.utils import resample
@@ -21,7 +22,7 @@ from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 
 
-def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
+def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,penalty=0.1):
     
     '''
 	Compute CPH with bootstrapping
@@ -43,7 +44,7 @@ def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
             sample = resample(df,n_samples=n_size,random_state=i)#.reset_index(True)
             
             # calculate c-index and append to list
-            cph = CoxPHFitter(penalizer=0.0001).fit(sample, 'T_'+outcome, 'E_'+outcome)
+            cph = CoxPHFitter(penalizer=penalty).fit(sample, 'T_'+outcome, 'E_'+outcome)
             score = concordance_index(sample['T_'+outcome], -cph.predict_partial_hazard(sample), sample['E_'+outcome])
             metrics.append(score)
         
@@ -58,7 +59,7 @@ def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
         return print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
     
     else:
-        cph = CoxPHFitter().fit(df, 'T_'+outcome, 'E_'+outcome)
+        cph = CoxPHFitter(penalizer=penalty).fit(df, 'T_'+outcome, 'E_'+outcome)
         score = concordance_index(df['T_'+outcome], -cph.predict_partial_hazard(df), df['E_'+outcome])
         
         return print(name, 'CPH testing: {:.3f}'.format(score))

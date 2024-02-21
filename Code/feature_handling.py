@@ -8,10 +8,23 @@ Last updated Feb 16 2024
 """
 
 '''
-Two-stage unsupervised feature reduction: (1) variance filter, (2) volume correlation filter.
+The Python module "feature_handling.py" contains functions for feature reduction and selection. Here is a summary of the functions:
+
+varianceFilter: Filters a radiomics dataframe based on a variance threshold. It drops columns with variances below the threshold and returns the filtered dataframe.
+
+volumeFilter: Filters columns of a radiomics dataframe based on their correlation with the "original_shape_VoxelVolume" column. It drops columns with correlations above a threshold and returns the filtered dataframe.
+
+featureReduction: Performs feature reduction on radiomics data by applying both variance and volume filters. It returns the reduced radiomics dataframe.
+
+featureSelection: Selects the top 'numFeatures' features from a given dataframe using the mRMR feature selection algorithm. It returns the selected features along with the target variables.
+
+These functions provide a pipeline for reducing and selecting features in radiomics data.
 '''
 
+import numpy as np
 from sklearn.preprocessing import StandardScaler
+from sksurv.util import Surv
+from mrmr import mrmr_classif
 
 
 def varianceFilter(radiomics,varThresh=10,outcome='OS',returnColsFlag=True):
@@ -78,7 +91,7 @@ def volumeFilter(radiomics, volThresh=0.1, outcome='OS', returnColsFlag=True):
     else:
         return radiomics.drop(cols_to_drop, axis=1)
 
-def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',returnColsFlag=False,scaleFlag=False):
+def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFlag=False,returnColsFlag=False,scaleFlag=True):
     """
     Perform feature reduction on radiomics data.
 
@@ -94,11 +107,44 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',returnCol
     - df_volReduced (DataFrame): The reduced radiomics data.
 
     """
+    
+    if numMetsFlag:
+        numMets = radiomics.pop('NumMets')
+    
     df_varReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
     df_volReduced = volumeFilter(df_varReduced,volThresh,outcome,returnColsFlag)
     
     if scaleFlag:
         scaledFeatures = StandardScaler().fit_transform(df_volReduced.iloc[:,1:-2])
         df_volReduced.iloc[:,1:-2] = scaledFeatures
+        
+    if numMetsFlag:
+        df_volReduced.insert(0,'NumMets',numMets)
 
     return df_volReduced
+
+def featureSelection(df,numFeatures=10,numMetsFlag=False):
+    """
+    Selects the top 'numFeatures' features from the given dataframe 'df' based on the mRMR feature selection algorithm.
+    
+    Parameters:
+    - df (DataFrame): Bulk features and target variables.
+    - numFeatures (int): The number of top features to select. Default is 10.
+    
+    Returns:
+    - df_Selected (DataFrame): Selected features and target variables.
+    """
+    
+    x = df.copy().iloc[:,:-2]
+    if numMetsFlag:
+        numMets = x.pop('NumMets')
+        numFeatures -= 1
+    y = Surv.from_arrays(df['E_OS'],df['T_OS'])
+
+    selected_features = mrmr_classif(x,y,numFeatures)
+    
+    df_Selected = df[selected_features+['T_OS','E_OS']]
+    if numMetsFlag:
+        df_Selected.insert(0,'NumMets',numMets)
+    
+    return df_Selected

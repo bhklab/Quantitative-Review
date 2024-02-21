@@ -44,7 +44,7 @@ def calcNumMets(radiomics):
     
     return numMets
 
-def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
+def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
     """
     Calculate the unweighted average of radiomics features for each subject.
 
@@ -85,7 +85,7 @@ def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, nu
         
     return df_UnweightedAverage
 
-def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=True):
+def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
     """
     Calculates the volume-weighted average of radiomics features for each subject.
 

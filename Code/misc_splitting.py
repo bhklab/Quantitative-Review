@@ -12,6 +12,7 @@ Miscellaneous helper and data-splitting functions.
 '''
 
 import numpy as np, pandas as pd
+from sklearn.model_selection import train_test_split
 
 def calcNumMets(radiomics):
     """

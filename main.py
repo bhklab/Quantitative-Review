@@ -14,19 +14,14 @@ Last updated Jan 4 2024
 import os
 os.chdir(os.path.dirname(__file__))
 import numpy as np, pandas as pd
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from pymrmre import mrmr
 
+# custom functions
 import Code.misc_splitting as ms
 import Code.lesion_selection as ls
 import Code.lesion_aggregation as la
 import Code.feature_handling as fh
 import Code.survival_analysis as sa
-    
-
-
-        
+     
 
 # %% DATA LOADING
 
@@ -50,18 +45,19 @@ del(id_counts,valid_ids)
 # %% TESTING
 
 
-aggName = 'weighted 3 largest'
+aggName = 'largest'
+inclMetsFlag = False
 
 # RADCURE
 df_imaging = radcure_radiomics
 df_clinical = radcure_clinical
-train,test = randomSplit(df_imaging,df_clinical,0.7,False)
+train,test = ms.randomSplit(df_imaging,df_clinical,0.7,False)
 val = np.nan
 
 # SARC021
 # df_imaging = sarc021_radiomics2Plus
 # df_clinical = sarc021_clinical
-# train,test,val = singleInstValidationSplit(df_imaging,df_clinical,0.7)
+# train,test,val = singleInstValidationSplit(df_imaging,df_clinical,0.8)
 
 pipe_dict = {
                 'train' : [train,True],
@@ -85,11 +81,13 @@ df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].re
 df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 
 # aggregate, reduce (variance and volume adjustment) and select features
-trainingSet = featureSelection(featureReduction(calcVolumeWeightedAverageNLargest(df_imaging_train,df_clinical_train,numLesions=2)),volFlag=False,scaleFlag=True,numFeatures=10)
+trainingSet = fh.featureSelection(
+                                    fh.featureReduction(
+                                        func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',1),numMetsFlag=inclMetsFlag),numFeatures=5,numMetsFlag=inclMetsFlag)
 # trainingSet = calcCosineMetrics(df_imaging_train,df_clinical_train)
 
-CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1],penalty=0.0001)
+sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 # RSF_bootstrap(selectedFeatures,aggName,'OS',pipe_dict[split][1])
 
 # ----- TESTING SET -----
@@ -97,10 +95,10 @@ LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 df_imaging_test = df_imaging[df_imaging.USUBJID.isin(pipe_dict['test'][0])].reset_index()
 df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].reset_index()
 
-testingSet = prepTestData(calcVolumeWeightedAverageNLargest(df_imaging_test,df_clinical_test,numLesions=2), trainingSet.columns)
+testingSet = func_dict[aggName](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',1)[trainingSet.columns]
 # testingSet = calcCosineMetrics(df_imaging_test,df_clinical_test)
-CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['test'][1])
-LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['test'][1])
+sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],penalty=0.0001)
+sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1])
 
 # %%
 # ----- SARC021 SINGLE INSTITUTION VALIDATION -----
@@ -112,18 +110,6 @@ validationSet = prepTestData(calcVolumeWeightedAverageNLargest(df_imaging_val,df
 # validationSet = calcCosineMetrics(df_imaging_val,df_clinical_val)
 CPH_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1])
 LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1])
-
-
-# %%
-# Fit a Cox Proportional Hazards model
-cph = CoxPHFitter()
-cph.fit(selectedFeatures, duration_col="T_OS", event_col="E_OS")
-
-cph2 = CoxPHFitter()
-cph2.fit(radcure_largest[["original_shape_VoxelVolume","T_OS","E_OS"]], duration_col="T_OS", event_col="E_OS")
-
-# Display the results
-print(cph.summary)
 
 
 	
