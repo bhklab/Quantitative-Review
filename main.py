@@ -45,13 +45,13 @@ del(id_counts,valid_ids)
 # %% TESTING
 
 
-aggName = 'largest'
+aggName = 'smallest'
 inclMetsFlag = False
 
 # RADCURE
 df_imaging = radcure_radiomics
 df_clinical = radcure_clinical
-train,test = ms.randomSplit(df_imaging,df_clinical,0.7,False)
+train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
 val = np.nan
 
 # SARC021
@@ -83,11 +83,12 @@ df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])]
 # aggregate, reduce (variance and volume adjustment) and select features
 trainingSet = fh.featureSelection(
                                     fh.featureReduction(
-                                        func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',1),numMetsFlag=inclMetsFlag),numFeatures=5,numMetsFlag=inclMetsFlag)
+                                        func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',1),numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)
+
+# trainingSet = fh.featureSelection(func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag,scaleFlag=True).drop('USUBJID',1),numFeatures=10,numMetsFlag=inclMetsFlag)
+
 # trainingSet = calcCosineMetrics(df_imaging_train,df_clinical_train)
 
-sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1],penalty=0.0001)
-sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 # RSF_bootstrap(selectedFeatures,aggName,'OS',pipe_dict[split][1])
 
 # ----- TESTING SET -----
@@ -97,8 +98,12 @@ df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].r
 
 testingSet = func_dict[aggName](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',1)[trainingSet.columns]
 # testingSet = calcCosineMetrics(df_imaging_test,df_clinical_test)
-sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],penalty=0.0001)
-sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1])
+
+best_params = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params)
+
+best_params = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params)
 
 # %%
 # ----- SARC021 SINGLE INSTITUTION VALIDATION -----

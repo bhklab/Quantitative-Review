@@ -15,39 +15,64 @@ Models:
 """
 
 import numpy as np
-from lifelines import CoxPHFitter
-from lifelines.utils import concordance_index
+# from lifelines import CoxPHFitter
+# from lifelines.utils import concordance_index
 from sklearn.utils import resample
+from sksurv.util import Surv
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
+from sklearn.model_selection import GridSearchCV 
+from lifelines.utils.sklearn_adapter import sklearn_adapter
 
-
-def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,penalty=0.1):
-    
+def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,param_grid=None):
     '''
-	Compute CPH with bootstrapping
+    Compute CPH with bootstrapping
 
-	:param df: (pandas DataFrame) selected features + survival data
-    :param name: (str) feature aggregation / lesion selection identifier
-    :param outcome: (str) outcome modelled (default overall survival (OS))
-	:return: (str) C-index (95% confidence interval)
-	'''
+    Parameters:    
+    - df (DataFrame): selected features + survival data
+    - name (str): feature aggregation / lesion selection identifier
+    - outcome (str): outcome modelled (default overall survival (OS))
+    - trainFlag (bool): flag indicating whether to perform training or testing
+    - param_grid (dict): hyperparameter grid for CoxPHFitter (optional)
     
+    Returns:
+    - best_params (dict): optimal hyperparameters for the model (when trainFlag is True)
+    - print (str): C-index (95% confidence interval when trainFlag is True)
+    '''
+
     if trainFlag:
+        
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
+        
+        params   = {
+                    'alpha': [1.0, 10.0, 100.0, 1000.0],  
+                    'tol': [1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]     
+                    }
+        
+        clf = GridSearchCV(CoxPHSurvivalAnalysis(), params, cv=5)
+        clf.fit(X,Y)
+
         # configure bootstrap (sampling 50% of data)
         n_iterations = 100
         n_size = int(len(df) * 0.50)
-    
+
         metrics = []
-    
+
         for i in range(n_iterations):
-            sample = resample(df,n_samples=n_size,random_state=i)#.reset_index(True)
-            
+            sample = resample(df, n_samples=n_size, random_state=i)
+            dat = sample.copy()
+            Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+            X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
+
             # calculate c-index and append to list
-            cph = CoxPHFitter(penalizer=penalty).fit(sample, 'T_'+outcome, 'E_'+outcome)
-            score = concordance_index(sample['T_'+outcome], -cph.predict_partial_hazard(sample), sample['E_'+outcome])
+            cph = CoxPHSurvivalAnalysis(alpha = clf.best_params_['alpha'], tol = clf.best_params_['tol']).fit(X,Y)
+            score = cph.score(X,Y)
             metrics.append(score)
-        
+
         # calculate confidence interval
         alpha = 0.95
         p = ((1.0 - alpha) / 2.0) * 100
@@ -55,17 +80,22 @@ def CPH_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,penal
         p = (alpha + ((1.0 - alpha) / 2.0)) * 100
         upper = min(1.0, np.percentile(metrics, p))
         med = np.percentile(metrics, 50)
-        
-        return print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
-    
+
+        return clf.best_params_, print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+
     else:
-        cph = CoxPHFitter(penalizer=penalty).fit(df, 'T_'+outcome, 'E_'+outcome)
-        score = concordance_index(df['T_'+outcome], -cph.predict_partial_hazard(df), df['E_'+outcome])
         
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
+        
+        cph = CoxPHSurvivalAnalysis(alpha = param_grid[0]['alpha'], tol = param_grid[0]['tol']).fit(X,Y)
+        score = cph.score(X,Y)
+
         return print(name, 'CPH testing: {:.3f}'.format(score))
     
 
-def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
+def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param_grid=None):
     
     '''
 	Compute Lasso-Cox with bootstrapping
@@ -77,6 +107,19 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
 	'''
     
     if trainFlag:
+        
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
+                
+        params   = {
+                    # 'alpha': [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+                    'tol': [1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]     
+                    }
+        
+        clf = GridSearchCV(CoxPHSurvivalAnalysis(), params, cv=5)
+        clf.fit(X,Y)
+        
         # configure bootstrap (sampling 50% of data)
         n_iterations = 100
         n_size = int(len(df) * 0.50)
@@ -93,7 +136,7 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
             y = y.to_records(index=False)
             
             # calculate c-index and append to list
-            estimator = CoxnetSurvivalAnalysis(l1_ratio=1, alphas=None)
+            estimator = CoxnetSurvivalAnalysis(l1_ratio = 0.5, tol = clf.best_params_['tol'])
             estimator.fit(X, y)
             score = estimator.score(X, y)
             metrics.append(score)
@@ -106,7 +149,7 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         upper = min(1.0, np.percentile(metrics, p))
         med = np.percentile(metrics, 50)
     
-        return print(name, 'Lasso-Cox training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+        return clf.best_params_, print(name, 'Lasso-Cox training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
 	
     else:
         X = df.copy().iloc[:,:-2]
@@ -117,7 +160,7 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         y = y.to_records(index=False)
         
         # calculate c-index and append to list
-        estimator = CoxnetSurvivalAnalysis(l1_ratio=1, alphas=None)
+        estimator = CoxnetSurvivalAnalysis(l1_ratio = 0.5, tol = param_grid[0]['tol'])
         estimator.fit(X, y)
         score = estimator.score(X, y)
         
