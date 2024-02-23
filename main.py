@@ -45,7 +45,7 @@ del(id_counts,valid_ids)
 # %% TESTING
 
 
-aggName = 'smallest'
+aggName = 'cosine'
 inclMetsFlag = False
 
 # RADCURE
@@ -66,12 +66,15 @@ pipe_dict = {
     }
 
 func_dict = {
-                'largest'  : ls.selectLargestLesion,
-                'smallest' : ls.selectSmallestLesion,
-                'primary'  : ls.selectPrimaryTumor,
-                'lung'     : ls.selectLargestLungLesion,
-                'UWA'      : la.calcUnweightedAverage,
-                'VWA'      : la.calcVolumeWeightedAverage
+                'largest'  : [ls.selectLargestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'smallest' : [ls.selectSmallestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'primary'  : [ls.selectPrimaryTumor, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'lung'     : [ls.selectLargestLungLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'UWA'      : [la.calcUnweightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'VWA'      : [la.calcVolumeWeightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'VWANLrg'  : [la.calcVolumeWeightedAverageNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'cosine'   : [la.calcCosineMetrics, lambda x: x],
+                'concat'   : [la.concatenateNLargest, lambda x: fh.featureSelection(x,scaleFlag=True)]
     
     }
     
@@ -80,25 +83,17 @@ func_dict = {
 df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 
-# aggregate, reduce (variance and volume adjustment) and select features
-trainingSet = fh.featureSelection(
-                                    fh.featureReduction(
-                                        func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',1),numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)
+trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',1))
 
-# trainingSet = fh.featureSelection(func_dict[aggName](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag,scaleFlag=True).drop('USUBJID',1),numFeatures=10,numMetsFlag=inclMetsFlag)
-
-# trainingSet = calcCosineMetrics(df_imaging_train,df_clinical_train)
-
-# RSF_bootstrap(selectedFeatures,aggName,'OS',pipe_dict[split][1])
 
 # ----- TESTING SET -----
 # isolate the patients in the defined split (i.e., train/test/val)
 df_imaging_test = df_imaging[df_imaging.USUBJID.isin(pipe_dict['test'][0])].reset_index()
 df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].reset_index()
 
-testingSet = func_dict[aggName](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',1)[trainingSet.columns]
-# testingSet = calcCosineMetrics(df_imaging_test,df_clinical_test)
-# %%
+testingSet = func_dict[aggName][0](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',1)[trainingSet.columns]
+
+
 best_params_CPH = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_CPH)
 
