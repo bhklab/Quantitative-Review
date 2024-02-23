@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Nov 29 2023
-Last updated Jan 4 2024
+Last updated Feb 23 2024
 
-@author: cgeady
+@author: caryn-geady
 """
 
 
@@ -74,7 +74,7 @@ func_dict = {
                 'VWA'      : la.calcVolumeWeightedAverage
     
     }
-
+    
 # ----- TRAINING SET -----
 # isolate the patients in the defined split (i.e., train/test/val)
 df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].reset_index()
@@ -98,12 +98,17 @@ df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].r
 
 testingSet = func_dict[aggName](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',1)[trainingSet.columns]
 # testingSet = calcCosineMetrics(df_imaging_test,df_clinical_test)
+# %%
+best_params_CPH = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_CPH)
 
-best_params = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params)
+best_params_LAS = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_LAS)
 
-best_params = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params)
+# %%
+
+best_params_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_RSF)
 
 # %%
 # ----- SARC021 SINGLE INSTITUTION VALIDATION -----

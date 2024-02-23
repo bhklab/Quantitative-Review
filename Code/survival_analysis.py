@@ -80,8 +80,10 @@ def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,pa
         p = (alpha + ((1.0 - alpha) / 2.0)) * 100
         upper = min(1.0, np.percentile(metrics, p))
         med = np.percentile(metrics, 50)
-
-        return clf.best_params_, print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+        
+        print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+        
+        return clf.best_params_
 
     else:
         
@@ -89,10 +91,12 @@ def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,pa
         Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
         X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
         
-        cph = CoxPHSurvivalAnalysis(alpha = param_grid[0]['alpha'], tol = param_grid[0]['tol']).fit(X,Y)
+        cph = CoxPHSurvivalAnalysis(alpha = param_grid['alpha'], tol = param_grid['tol']).fit(X,Y)
         score = cph.score(X,Y)
+        
+        print(name, 'CPH testing: {:.3f}'.format(score))
 
-        return print(name, 'CPH testing: {:.3f}'.format(score))
+        return None
     
 
 def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param_grid=None):
@@ -128,17 +132,15 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         
         for i in range(n_iterations):
             sample = resample(df,n_samples=n_size,random_state=i)#.reset_index(True)
-            X = sample.copy().iloc[:,:-2]
             
-            X = X.to_numpy()
-            y = sample[['E_'+outcome, 'T_'+outcome]].copy()
-            y['E_'+outcome] = y['E_'+outcome].astype('bool')
-            y = y.to_records(index=False)
+            dat = sample.copy()
+            Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+            X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
             
             # calculate c-index and append to list
             estimator = CoxnetSurvivalAnalysis(l1_ratio = 0.5, tol = clf.best_params_['tol'])
-            estimator.fit(X, y)
-            score = estimator.score(X, y)
+            estimator.fit(X,Y)
+            score = estimator.score(X,Y)
             metrics.append(score)
         
         # calculate confidence interval
@@ -148,26 +150,28 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         p = (alpha + ((1.0 - alpha) / 2.0)) * 100
         upper = min(1.0, np.percentile(metrics, p))
         med = np.percentile(metrics, 50)
+        
+        print(name, 'Lasso-Cox training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
     
-        return clf.best_params_, print(name, 'Lasso-Cox training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+        return clf.best_params_ 
 	
     else:
-        X = df.copy().iloc[:,:-2]
         
-        X = X.to_numpy()
-        y = df[['E_'+outcome, 'T_'+outcome]].copy()
-        y['E_'+outcome] = y['E_'+outcome].astype('bool')
-        y = y.to_records(index=False)
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
         
         # calculate c-index and append to list
-        estimator = CoxnetSurvivalAnalysis(l1_ratio = 0.5, tol = param_grid[0]['tol'])
-        estimator.fit(X, y)
-        score = estimator.score(X, y)
+        estimator = CoxnetSurvivalAnalysis(l1_ratio = 0.5, tol = param_grid['tol'])
+        estimator.fit(X,Y)
+        score = estimator.score(X,Y)
         
-        return print(name, 'Lasso-Cox testing: {:.3f}'.format(score))
+        print(name, 'Lasso-Cox testing: {:.3f}'.format(score))
+        
+        return None
         
 
-def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
+def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param_grid=None):
     
     '''
 	Compute RSF with bootstrapping
@@ -178,12 +182,21 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
 	:return: (str) C-index (95% confidence interval)
 	'''
     
-    # parameters
-    NUMESTIMATORS = 100
-    TESTSIZE = 0.20
-    random_state = 20
-    
     if trainFlag:
+        
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
+                
+        params   = {
+                    'n_estimators' : [50,100,150],
+                    'max_features' : ["sqrt","log2",None],
+                    'min_samples_split' : [5,10,15],
+                    'min_samples_leaf' : [3,6,9]  
+                    }
+        
+        clf = GridSearchCV(RandomSurvivalForest(), params, cv=5)
+        clf.fit(X,Y)
     
         # configure bootstrap (sampling 50% of data)
         n_iterations = 100
@@ -193,24 +206,22 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
     
         for i in range(n_iterations):
             sample = resample(df,n_samples=n_size,random_state=i)
-            X = sample.copy().iloc[:,:-2]
             
-            X = X.to_numpy().astype('float64')
-            y = sample[['E_'+outcome, 'T_'+outcome]].copy()
-            y['E_'+outcome] = y['E_'+outcome].astype('bool')
-            y['T_'+outcome] = y['T_'+outcome].astype('float64')
-            y = y.to_records(index=False)
+            dat = sample.copy()
+            Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+            X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
         
             # calculate c-index and append to list
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TESTSIZE, random_state=random_state)
-            rsf = RandomSurvivalForest(n_estimators=NUMESTIMATORS,
-                                   min_samples_split=15,
-                                   min_samples_leaf=8,
-                                   max_features="sqrt",
-                                   n_jobs=-1,
-                                   random_state=random_state)
-            rsf.fit(X_train, y_train)
-            score = rsf.score(X_test, y_test)
+            rsf = RandomSurvivalForest(
+                                        n_estimators = clf.best_params_['n_estimators'],
+                                        max_features = clf.best_params_['max_features'],
+                                        min_samples_split = clf.best_params_['min_samples_split'],
+                                        min_samples_leaf = clf.best_params_['min_samples_leaf'],
+                                        n_jobs=-1,
+                                        random_state=i
+                                        )
+            rsf.fit(X,Y)
+            score = rsf.score(X,Y)
             metrics.append(score)
         
         # calculate confidence interval
@@ -220,27 +231,29 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True):
         p = (alpha + ((1.0 - alpha) / 2.0)) * 100
         upper = min(1.0, np.percentile(metrics, p))
         med = np.percentile(metrics, 50)
+        
+        print(name, 'RSF training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
     
-        return print(name, 'RSF training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
+        return clf.best_params_
     
     else:
-        X = df.copy().iloc[:,:-2]
         
-        X = X.to_numpy().astype('float64')
-        y = df[['E_'+outcome, 'T_'+outcome]].copy()
-        y['E_'+outcome] = y['E_'+outcome].astype('bool')
-        y['T_'+outcome] = y['T_'+outcome].astype('float64')
-        y = y.to_records(index=False)
+        dat = df.copy()
+        Y = Surv.from_arrays(dat['E_OS'],dat['T_OS'])
+        X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
     
         # calculate c-index and append to list
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TESTSIZE, random_state=random_state)
-        rsf = RandomSurvivalForest(n_estimators=NUMESTIMATORS,
-                               min_samples_split=15,
-                               min_samples_leaf=8,
-                               max_features="sqrt",
-                               n_jobs=-1,
-                               random_state=random_state)
-        rsf.fit(X_train, y_train)
-        score = rsf.score(X_test, y_test)
+        rsf = RandomSurvivalForest(
+                                    n_estimators = param_grid['n_estimators'],
+                                    max_features = param_grid['max_features'],
+                                    min_samples_split = param_grid['min_samples_split'],
+                                    min_samples_leaf = param_grid['min_samples_leaf'],
+                                    n_jobs=-1,
+                                    random_state=i
+                                    )
+        rsf.fit(X,Y)
+        score = rsf.score(X,Y)
         
-        return print(name, 'RSF testing: {:.3f}'.format(score))
+        print(name, 'RSF testing: {:.3f}'.format(score))
+        
+        return None

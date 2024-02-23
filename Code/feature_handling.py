@@ -123,7 +123,7 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFl
 
     return df_volReduced
 
-def featureSelection(df,numFeatures=10,numMetsFlag=False):
+def featureSelection(df,numFeatures=10,numMetsFlag=False,scaleFlag=False):
     """
     Selects the top 'numFeatures' features from the given dataframe 'df' based on the mRMR feature selection algorithm.
     
@@ -134,6 +134,10 @@ def featureSelection(df,numFeatures=10,numMetsFlag=False):
     Returns:
     - df_Selected (DataFrame): Selected features and target variables.
     """
+    
+    if scaleFlag:
+        scaledFeatures = StandardScaler().fit_transform(df.iloc[:,1:-2])
+        df.iloc[:,1:-2] = scaledFeatures
     
     x = df.copy().iloc[:,:-2]
     if numMetsFlag:
