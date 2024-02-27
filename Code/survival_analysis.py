@@ -24,7 +24,7 @@ from sksurv.metrics import concordance_index_censored
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 from sklearn.model_selection import GridSearchCV 
-from lifelines.utils.sklearn_adapter import sklearn_adapter
+# from lifelines.utils.sklearn_adapter import sklearn_adapter
 
 def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,param_grid=None):
     '''

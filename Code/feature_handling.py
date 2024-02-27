@@ -139,7 +139,7 @@ def featureSelection(df,numFeatures=10,numMetsFlag=False,scaleFlag=False):
         scaledFeatures = StandardScaler().fit_transform(df.iloc[:,1:-2])
         df.iloc[:,1:-2] = scaledFeatures
     
-    x = df.copy().iloc[:,:-2]
+    x = df.copy().iloc[:,1:-2]
     if numMetsFlag:
         numMets = x.pop('NumMets')
         numFeatures -= 1
