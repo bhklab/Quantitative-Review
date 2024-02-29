@@ -272,3 +272,36 @@ def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag
         df_CosineMetrics.insert(1,"NumMets",calcNumMets(df_radiomics).NumMets,True)
         
     return df_CosineMetrics
+
+def interLesionRelationNetwork():
+    
+    '''
+    Algorithm:
+        - using original features only:
+            - separate by feature class (first-order, shape, GLCM, etc.)
+            - calculate the data depth of each class on a patient-by-patient basis
+            - this should reduce the feature set for each patient from 1218-->100-->6
+        - using the reduced feature set of class-specific data depth for all lesions,
+            - cluster lesions using k-means clustering
+            - grid search for appropriate number of clusters to maintain intracluster homoegeneity
+            - this reduces each lesion-specific feature set from 6-->1, where
+            - the remaining number is a radiographic lesion class
+        - "Qualitative Assessment of Inter-tumor Heterogeneity" -- separate patients into 2 groups:
+            - homogeneous radiomic profiles
+            - heterogeneous radiomic profiles
+        - "Quantitative Assessment of Inter-tumor Heterogeneity" -- using the feature set of 6 data depths per lesion:
+            - create a patient-specific dendrogram 
+            - calculate derived metrics from the dendrogram:
+                1. number of lesions
+                2. sum of tree branch lengths
+                3. dispersion among lesions
+                4. number of different phenotypes
+    
+    
+    '''
+    
+    # cols = cols[np.where(cols.str.contains('original'))[0]]
+    
+    return print('In progress...')
+
+

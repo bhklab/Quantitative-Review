@@ -1,4 +1,4 @@
-name: quant-review
+name: quant-review-testing
 channels:
   - defaults
 dependencies:

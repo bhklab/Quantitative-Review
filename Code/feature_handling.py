@@ -21,7 +21,7 @@ featureSelection: Selects the top 'numFeatures' features from a given dataframe 
 These functions provide a pipeline for reducing and selecting features in radiomics data.
 '''
 
-import numpy as np
+import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sksurv.util import Surv
 from mrmr import mrmr_classif
@@ -123,7 +123,7 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFl
 
     return df_volReduced
 
-def featureSelection(df,numFeatures=10,numMetsFlag=False,scaleFlag=False):
+def featureSelection(df,outcome='OS',numFeatures=10,numMetsFlag=False,scaleFlag=False):
     """
     Selects the top 'numFeatures' features from the given dataframe 'df' based on the mRMR feature selection algorithm.
     
@@ -135,19 +135,32 @@ def featureSelection(df,numFeatures=10,numMetsFlag=False,scaleFlag=False):
     - df_Selected (DataFrame): Selected features and target variables.
     """
     
-    if scaleFlag:
-        scaledFeatures = StandardScaler().fit_transform(df.iloc[:,1:-2])
-        df.iloc[:,1:-2] = scaledFeatures
+    dup = df.copy()
     
-    x = df.copy().iloc[:,1:-2]
+    if 'E_'+outcome in dup.columns:
+        df_surv = dup.pop('E_'+outcome)
+        
+    if 'T_'+outcome in dup.columns:
+        df_surv = pd.concat((df_surv,dup.pop('T_'+outcome)),axis=1)
+    
+    if scaleFlag:
+        scaledFeatures = StandardScaler().fit_transform(dup.iloc[:,1:])
+        dup.iloc[:,1:] = scaledFeatures
+    
+    x = dup.copy().iloc[:,1:]
+    
     if numMetsFlag:
         numMets = x.pop('NumMets')
         numFeatures -= 1
-    y = Surv.from_arrays(df['E_OS'],df['T_OS'])
+    
+    if len(df_surv.shape)>1:
+        y = Surv.from_arrays(df['E_OS'],df['T_OS'])
+    else:
+        y = df_surv.values
 
     selected_features = mrmr_classif(x,y,numFeatures)
     
-    df_Selected = df[selected_features+['T_OS','E_OS']]
+    df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
     if numMetsFlag:
         df_Selected.insert(0,'NumMets',numMets)
     
