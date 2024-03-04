@@ -24,7 +24,7 @@ These functions provide a pipeline for reducing and selecting features in radiom
 import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sksurv.util import Surv
-from mrmr import mrmr_classif
+from mrmr import mrmr_classif, mrmr_regression
 
 
 def varianceFilter(radiomics,varThresh=10,outcome='OS',returnColsFlag=True):
@@ -110,13 +110,23 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFl
     
     if numMetsFlag:
         numMets = radiomics.pop('NumMets')
+        
+    if scaleFlag:
+        scaledFeatures = StandardScaler().fit_transform(radiomics.iloc[:,:-2])
+        radiomics.iloc[:,:-2] = scaledFeatures
     
     df_varReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
     df_volReduced = volumeFilter(df_varReduced,volThresh,outcome,returnColsFlag)
     
-    if scaleFlag:
-        scaledFeatures = StandardScaler().fit_transform(df_volReduced.iloc[:,1:-2])
-        df_volReduced.iloc[:,1:-2] = scaledFeatures
+    # remove columns that don't have at least 10 unique values -- after scaling, some features have effectively only 2 unique values
+    # this is not caught using variance reduction when the two values are very different
+    # this is also not caught when looking at correlation to volume
+    # DAMNINGLY, these features cause singularity problems when modelling
+    # so, we force-remove them here
+    counts_per_feature = np.array([len(np.unique(df_volReduced[col])) for col in df_volReduced.columns])
+    # print(counts_per_feature)
+    cols_to_drop = np.array(df_volReduced.columns)[counts_per_feature<10][:-1]
+    df_volReduced = df_volReduced.drop(cols_to_drop,axis=1)
         
     if numMetsFlag:
         df_volReduced.insert(0,'NumMets',numMets)
@@ -144,21 +154,25 @@ def featureSelection(df,outcome='OS',numFeatures=10,numMetsFlag=False,scaleFlag=
         df_surv = pd.concat((df_surv,dup.pop('T_'+outcome)),axis=1)
     
     if scaleFlag:
-        scaledFeatures = StandardScaler().fit_transform(dup.iloc[:,1:])
-        dup.iloc[:,1:] = scaledFeatures
+        scaledFeatures = StandardScaler().fit_transform(dup.iloc[:,:])
+        dup.iloc[:,:] = scaledFeatures
     
-    x = dup.copy().iloc[:,1:]
+    x = dup.copy().iloc[:,:]
+    # print('x shape: ', x.shape)
     
     if numMetsFlag:
         numMets = x.pop('NumMets')
         numFeatures -= 1
     
     if len(df_surv.shape)>1:
-        y = Surv.from_arrays(df['E_OS'],df['T_OS'])
+        y = Surv.from_arrays(df_surv['E_OS'],df_surv['T_OS'])
+        # print(y)
     else:
         y = df_surv.values
+        # print(y)
 
     selected_features = mrmr_classif(x,y,numFeatures)
+    # print('selected features: ',selected_features)
     
     df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
     if numMetsFlag:

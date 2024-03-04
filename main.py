@@ -32,15 +32,18 @@ sarc021_clinical = pd.read_csv('Data/SARC021/SARC021_clinical.csv')
 # optional ? -- look only at those patients with 2+ lesions contoured
 id_counts = sarc021_radiomics['USUBJID'].value_counts()
 valid_ids = id_counts[id_counts >= 2].index
-sarc021_radiomics2Plus = sarc021_radiomics[sarc021_radiomics['USUBJID'].isin(valid_ids)].reset_index()
+sarc021_radiomics = sarc021_radiomics[sarc021_radiomics['USUBJID'].isin(valid_ids)].reset_index()
 
 # RADCURE
 radcure_radiomics = pd.read_csv('Data/RADCURE/RADCURE_radiomics.csv')
 radcure_clinical = pd.read_csv('Data/RADCURE/RADCURE_clinical.csv')
 
+# CRLM 
+crlm_radiomics = pd.read_csv('Data/TCIA-CRLM/CRLM_radiomics.csv')
+crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical.csv')
+
+
 del(id_counts,valid_ids)
-
-
 
 # %% TESTING
 
@@ -49,15 +52,20 @@ aggName = 'largest'
 inclMetsFlag = False
 
 # RADCURE
-df_imaging = radcure_radiomics
-df_clinical = radcure_clinical
-train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
-val = np.nan
+# df_imaging = radcure_radiomics
+# df_clinical = radcure_clinical
+
+# TCIA-CRLM
+# df_imaging = crlm_radiomics
+# df_clinical = crlm_clinical
+
+# train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
+# val = np.nan
 
 # SARC021
-# df_imaging = sarc021_radiomics2Plus
-# df_clinical = sarc021_clinical
-# train,test,val = singleInstValidationSplit(df_imaging,df_clinical,0.8)
+df_imaging = sarc021_radiomics
+df_clinical = sarc021_clinical
+train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
 
 pipe_dict = {
                 'train' : [train,True],
@@ -84,8 +92,10 @@ df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].re
 df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 
 trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
+#debugging = func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1)
+# debugging = fh.featureReduction(func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1),numMetsFlag=inclMetsFlag,scaleFlag=True)
 
-# %%
+# 
 # ----- TESTING SET -----
 # isolate the patients in the defined split (i.e., train/test/val)
 df_imaging_test = df_imaging[df_imaging.USUBJID.isin(pipe_dict['test'][0])].reset_index()

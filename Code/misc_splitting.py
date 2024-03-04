@@ -22,7 +22,7 @@ def calcNumMets(radiomics):
     - radiomics (DataFrame): The radiomics dataset containing USUBJID information.
     
     Returns:
-    - numMet (DataFrame): DataFrame with two columns - 'USUBJID' and 'NumMets', representing the unique USUBJID and the corresponding number of metastases.
+    - numMets (DataFrame): DataFrame with two columns - 'USUBJID' and 'NumMets', representing the unique USUBJID and the corresponding number of metastases.
     """
 
     ids,counts = np.unique(radiomics.USUBJID,return_counts=True)

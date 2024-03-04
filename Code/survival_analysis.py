@@ -49,8 +49,8 @@ def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,pa
         X = dat.drop(['E_'+outcome, 'T_'+outcome], axis=1)
         
         params   = {
-                    'alpha': [1.0, 10.0, 100.0, 1000.0],  
-                    'tol': [1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]     
+                    'alpha': [1.0, 10.0, 100.0, 1000.0, 10000.0],  
+                    'tol': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]     
                     }
         
         clf = GridSearchCV(CoxPHSurvivalAnalysis(), params, cv=5)
