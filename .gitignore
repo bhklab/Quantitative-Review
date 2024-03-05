@@ -1,3 +1,8 @@
 
+Data/TCIA-CRLM/CRLM_radiomics.csv
+Data/TCIA-CRLM/CRLM_clinical.csv
 Data/RADCURE/RADCURE_radiomics.csv
+Data/RADCURE/RADCURE_clinical.csv
+Data/SARC021/SARC021_radiomics.csv
+Data/SARC021/SARC021_clinical.csv
 Data/.DS_Store
