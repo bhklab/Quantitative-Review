@@ -128,7 +128,8 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFl
     # so, we force-remove them here
     counts_per_feature = np.array([len(np.unique(df_volReduced[col])) for col in df_volReduced.columns])
     # print(counts_per_feature)
-    cols_to_drop = np.array(df_volReduced.columns)[counts_per_feature<10][:-1]
+    thresh = int(np.ceil(np.sqrt(df_volReduced.shape[0])))
+    cols_to_drop = np.array(df_volReduced.columns)[counts_per_feature<thresh][:-1]
     df_volReduced = df_volReduced.drop(cols_to_drop,axis=1)
         
     if numMetsFlag:
@@ -174,7 +175,7 @@ def featureSelection(df,outcome='OS',numFeatures=10,numMetsFlag=False,scaleFlag=
         y = df_surv.values
         # print(y)
 
-    selected_features = mrmr_classif(x,y,numFeatures)
+    selected_features = mrmr_classif(x,y,numFeatures,relevance='rf')
     # print('selected features: ',selected_features)
     
     df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
