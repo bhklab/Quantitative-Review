@@ -1,2 +1,6 @@
 # Quantitative Review
  Quantitative review of methods for analyzing multiple regions of interest (ROIs) in the context of engineered radiomics.
+ 
+Radiomics is a field within medical imaging whose primary goal is the transformation of medical images into mineable data for improved decision-making in diagnosis, prognosis, and treatment planning. Traditionally, radiomics has focused on the analysis of a single lesion within a patient, aiming to extract relevant features and understand the tumor's characteristics. While this practical approach minimizes computational complexity and utilizes simpler mathematical models, relying on a single lesion's analysis may not provide a complete picture of the disease's intra- and inter-lesion heterogeneity, particularly in patients with multiple lesions. 
+
+Currently, no established methodology for the optimal combination of radiomic features for patients with multiple lesions. The lack of a consensus methodology has led to a diverse array of approaches, each offering distinct advantages and trade-offs. This quantitative review endeavors to shed light on the available methodologies, highlight their strengths and weaknesses, and guide future research toward establishing best practices in this domain.
