@@ -91,7 +91,7 @@ def volumeFilter(radiomics, volThresh=0.1, outcome='OS', returnColsFlag=True):
     else:
         return radiomics.drop(cols_to_drop, axis=1)
 
-def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFlag=False,returnColsFlag=False,scaleFlag=True):
+def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFlag=False,returnColsFlag=False,scaleFlag=True,varOnly=False):
     """
     Perform feature reduction on radiomics data.
 
@@ -115,8 +115,11 @@ def featureReduction(radiomics,varThresh=10,volThresh=0.1,outcome='OS',numMetsFl
         scaledFeatures = StandardScaler().fit_transform(radiomics.iloc[:,:-2])
         radiomics.iloc[:,:-2] = scaledFeatures
     
-    df_varReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
-    df_volReduced = volumeFilter(df_varReduced,volThresh,outcome,returnColsFlag)
+    if varOnly:
+        df_volReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
+    else:
+        df_varReduced = varianceFilter(radiomics,varThresh,outcome,returnColsFlag)
+        df_volReduced = volumeFilter(df_varReduced,volThresh,outcome,returnColsFlag)
     
     # remove columns that don't have at least 10 unique values -- after scaling, some features have effectively only 2 unique values
     # this is not caught using variance reduction when the two values are very different

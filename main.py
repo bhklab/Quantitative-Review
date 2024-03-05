@@ -56,16 +56,16 @@ inclMetsFlag = False
 # df_clinical = radcure_clinical
 
 # TCIA-CRLM
-# df_imaging = crlm_radiomics
-# df_clinical = crlm_clinical
+df_imaging = crlm_radiomics
+df_clinical = crlm_clinical
 
-# train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
-# val = np.nan
+train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
+val = np.nan
 
 # SARC021
-df_imaging = sarc021_radiomics
-df_clinical = sarc021_clinical
-train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
+# df_imaging = sarc021_radiomics
+# df_clinical = sarc021_clinical
+# train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
 
 pipe_dict = {
                 'train' : [train,True],
@@ -82,7 +82,7 @@ func_dict = {
                 'VWA'      : [la.calcVolumeWeightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
                 'VWANLrg'  : [la.calcVolumeWeightedAverageNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
                 'cosine'   : [la.calcCosineMetrics, lambda x: x],
-                'concat'   : [la.concatenateNLargest, lambda x: fh.featureSelection(x,scaleFlag=True)]
+                'concat'   : [la.concatenateNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,varOnly=True))]
     
     }
     
@@ -112,19 +112,19 @@ sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=b
 
 # %%
 
-best_params_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_RSF)
+# best_params_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+# sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_RSF)
 
-# %%
+# %
 # ----- SARC021 SINGLE INSTITUTION VALIDATION -----
 # isolate the patients in the defined split (i.e., train/test/val)
 df_imaging_val = df_imaging[df_imaging.USUBJID.isin(pipe_dict['val'][0])].reset_index()
 df_clinical_val = df_clinical[df_clinical.USUBJID.isin(pipe_dict['val'][0])].reset_index()
 
-validationSet = prepTestData(calcVolumeWeightedAverageNLargest(df_imaging_val,df_clinical_val,numLesions=2), trainingSet.columns)
+validationSet = func_dict[aggName][0](df_imaging_val,df_clinical_val,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1)[trainingSet.columns]
 # validationSet = calcCosineMetrics(df_imaging_val,df_clinical_val)
-CPH_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1])
-LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1])
+sa.CPH_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_CPH)
+sa.LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_LAS)
 
 
 	
