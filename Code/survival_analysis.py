@@ -249,7 +249,7 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
                                     min_samples_split = param_grid['min_samples_split'],
                                     min_samples_leaf = param_grid['min_samples_leaf'],
                                     n_jobs=-1,
-                                    random_state=i
+                                    random_state=42
                                     )
         rsf.fit(X,Y)
         score = rsf.score(X,Y)

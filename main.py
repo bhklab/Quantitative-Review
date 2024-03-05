@@ -47,10 +47,14 @@ del(id_counts,valid_ids)
 
 # %% ANALYSIS
 
-dataName = 'sarc021'
+dataName = 'crlm'
 aggName = 'largest'
 inclMetsFlag = False
-rfFlag = False
+rfFlag = True
+
+print('----------')
+print(dataName, ' - ', aggName)
+print('----------')
 
 data_dict = {
                 'radcure' : [radcure_radiomics,radcure_clinical],
@@ -88,8 +92,9 @@ func_dict = {
 df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 
+print('feature selection')
 trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
-
+print('----------')
 # ----- TESTING -----
 df_imaging_test = df_imaging[df_imaging.USUBJID.isin(pipe_dict['test'][0])].reset_index()
 df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].reset_index()
@@ -120,7 +125,40 @@ if dataName == 'sarc021':
         sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_RSF)
 
 
-#%%
+    #%% TESTING
+
+outcome = 'OS'
+numFeatures = 10
+df = reduced_crlm
+
+dup = df.copy()
+
+if 'E_'+outcome in dup.columns:
+    df_surv = dup.pop('E_'+outcome)
+    
+if 'T_'+outcome in dup.columns:
+    df_surv = pd.concat((df_surv,dup.pop('T_'+outcome)),axis=1)
+
+x = dup.copy().iloc[:,:]
+# print('x shape: ', x.shape)
+
+if len(df_surv.shape)>1:
+    y = Surv.from_arrays(df_surv['E_OS'],df_surv['T_OS'])
+    # print(y)
+else:
+    y = df_surv.values
+    # print(y)
+
+selected_features = mrmr_classif(x,y,numFeatures,relevance='rf')
+# print('selected features: ',selected_features)
+
+df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
+
+
+
+
+
+# %%
 # ------------------------ #
 # Cox Proportional Hazards
 # ------------------------ #

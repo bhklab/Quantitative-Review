@@ -174,7 +174,7 @@ def featureSelection(df,outcome='OS',numFeatures=10,numMetsFlag=False,scaleFlag=
     else:
         y = df_surv.values
         # print(y)
-
+    
     selected_features = mrmr_classif(x,y,numFeatures,relevance='rf')
     # print('selected features: ',selected_features)
     
