@@ -17,6 +17,7 @@ Models:
 import numpy as np
 # from lifelines import CoxPHFitter
 # from lifelines.utils import concordance_index
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils import resample
 from sksurv.util import Surv
 from sksurv.linear_model import CoxPHSurvivalAnalysis
@@ -25,6 +26,45 @@ from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 from sklearn.model_selection import GridSearchCV 
 # from lifelines.utils.sklearn_adapter import sklearn_adapter
+
+def univariate_CPH(radiomics, clinical, feature='original_shape_VoxelVolume', mod_choice='total', outcome='OS'):
+    '''
+    Compute univariate CPH with parameter search
+
+    Parameters:    
+    - df (DataFrame): selected features + survival data
+    - outcome (str): outcome modelled (default overall survival (OS))
+    
+    Returns:
+    - print (str): C-index
+    '''
+
+    df_Volumes = radiomics[['USUBJID',feature]].copy()
+
+    mod_dict = {
+                'total' : df_Volumes.copy().groupby('USUBJID',as_index=False).sum().merge(clinical[['USUBJID','T_'+outcome,'E_'+outcome]],on='USUBJID').reset_index(drop=True),
+                'max'   : df_Volumes.copy().groupby('USUBJID',as_index=False).max().merge(clinical[['USUBJID','T_'+outcome,'E_'+outcome]],on='USUBJID').reset_index(drop=True)}
+
+    df_mod = mod_dict[mod_choice]    
+    df_mod[feature] = StandardScaler().fit_transform(df_mod[feature].values.reshape(-1,1))
+    
+    # prep for survival modelling
+    Y = Surv.from_arrays(df_mod['E_'+outcome],df_mod['T_'+outcome])
+    X = np.array(df_mod[feature]).reshape(-1, 1)
+        
+    params   = {
+                'alpha': [1.0, 10.0, 100.0, 1000.0, 10000.0],  
+                'tol': [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]     
+                }
+        
+    clf = GridSearchCV(CoxPHSurvivalAnalysis(), params, cv=5)
+    clf.fit(X,Y)
+
+    # calculate c-index using best parameters
+    cph = CoxPHSurvivalAnalysis(alpha = clf.best_params_['alpha'], tol = clf.best_params_['tol']).fit(X,Y)
+    score = cph.score(X,Y)
+            
+    return print('Univariate C-Index ({} volume): {}'.format(mod_choice,score))
 
 def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,param_grid=None):
     '''
@@ -83,7 +123,7 @@ def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,pa
         
         print(name, 'CPH training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
         
-        return clf.best_params_
+        return clf.best_params_, metrics
 
     else:
         
@@ -153,7 +193,7 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         
         print(name, 'Lasso-Cox training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
     
-        return clf.best_params_ 
+        return clf.best_params_, metrics 
 	
     else:
         
@@ -195,7 +235,7 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
                     'min_samples_leaf' : [3,6,9]  
                     }
         
-        clf = GridSearchCV(RandomSurvivalForest(), params, cv=5)
+        clf = GridSearchCV(RandomSurvivalForest(), params, cv=5,n_jobs=1,pre_dispatch=1,scoring='r2')
         clf.fit(X,Y)
     
         # configure bootstrap (sampling 50% of data)
@@ -217,8 +257,9 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
                                         max_features = clf.best_params_['max_features'],
                                         min_samples_split = clf.best_params_['min_samples_split'],
                                         min_samples_leaf = clf.best_params_['min_samples_leaf'],
-                                        n_jobs=-1,
-                                        random_state=i
+                                        n_jobs=1,
+                                        random_state=i,
+                                        bootstrap=False
                                         )
             rsf.fit(X,Y)
             score = rsf.score(X,Y)
@@ -234,7 +275,7 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
         
         print(name, 'RSF training: ', '%.3f (%.3f-%.3f)' % (med, lower, upper))
     
-        return clf.best_params_
+        return clf.best_params_, metrics
     
     else:
         
@@ -248,8 +289,9 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
                                     max_features = param_grid['max_features'],
                                     min_samples_split = param_grid['min_samples_split'],
                                     min_samples_leaf = param_grid['min_samples_leaf'],
-                                    n_jobs=-1,
-                                    random_state=42
+                                    n_jobs=1,
+                                    random_state=42,
+                                    bootstrap=False
                                     )
         rsf.fit(X,Y)
         score = rsf.score(X,Y)

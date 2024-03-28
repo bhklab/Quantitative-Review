@@ -41,8 +41,10 @@ def varianceFilter(radiomics,varThresh=10,outcome='OS',returnColsFlag=True):
     - cols_to_drop (Index): The dropped columns (if returnColsFlag is True).
     - radiomics (DataFrame): The filtered radiomics dataframe.
     """
-    
-    var = radiomics.var()
+    if 'USUBJID' in radiomics.columns:
+        var = radiomics.iloc[:,1:].var()
+    else:
+        var = radiomics.var()
     cols_to_drop = radiomics.columns[np.where(var>=varThresh)]
     
     if cols_to_drop.isin(['original_shape_VoxelVolume']).any():

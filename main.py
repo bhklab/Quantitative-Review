@@ -14,6 +14,8 @@ Last updated Feb 23 2024
 import os
 os.chdir(os.path.dirname(__file__))
 import numpy as np, pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # custom functions
 import Code.misc_splitting as ms
@@ -47,10 +49,13 @@ del(id_counts,valid_ids)
 
 # %% ANALYSIS
 
-dataName = 'crlm'
-aggName = 'largest'
+dataName = 'radcure'
+aggName = 'UWA'
 inclMetsFlag = False
 rfFlag = True
+uniFlag = False
+shuffleFlag = False
+numfeatures = 10
 
 print('----------')
 print(dataName, ' - ', aggName)
@@ -63,6 +68,15 @@ data_dict = {
         }
 
 df_imaging, df_clinical = data_dict[dataName][0],data_dict[dataName][1]
+
+if shuffleFlag:
+    df_clinical['T_OS'] = df_clinical['T_OS'].sample(frac=1).reset_index(drop=True)
+    df_clinical['E_OS'] = df_clinical['E_OS'].sample(frac=1).reset_index(drop=True)
+
+if uniFlag:
+    # print univariate results
+    sa.univariate_CPH(df_imaging,df_clinical,mod_choice='total')
+    sa.univariate_CPH(df_imaging,df_clinical,mod_choice='max')
 
 if dataName == 'sarc021':
     train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
@@ -77,13 +91,13 @@ pipe_dict = {
     }
 
 func_dict = {
-                'largest'  : [ls.selectLargestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'smallest' : [ls.selectSmallestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'primary'  : [ls.selectPrimaryTumor, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'lung'     : [ls.selectLargestLungLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'UWA'      : [la.calcUnweightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'VWA'      : [la.calcVolumeWeightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
-                'VWANLrg'  : [la.calcVolumeWeightedAverageNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=10,numMetsFlag=inclMetsFlag)],
+                'largest'  : [ls.selectLargestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'smallest' : [ls.selectSmallestLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'primary'  : [ls.selectPrimaryTumor, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'lung'     : [ls.selectLargestLungLesion, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'UWA'      : [la.calcUnweightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'VWA'      : [la.calcVolumeWeightedAverage, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
+                'VWANLrg'  : [la.calcVolumeWeightedAverageNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,numMetsFlag=inclMetsFlag,scaleFlag=True),numFeatures=numfeatures,numMetsFlag=inclMetsFlag)],
                 'cosine'   : [la.calcCosineMetrics, lambda x: x],
                 'concat'   : [la.concatenateNLargest, lambda x: fh.featureSelection(fh.featureReduction(x,varOnly=True))]
     }
@@ -101,18 +115,20 @@ df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].r
 
 testingSet = func_dict[aggName][0](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1)[trainingSet.columns]
 
-best_params_CPH = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+best_params_CPH, scores_CPH = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_CPH)
 
-best_params_LAS = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+best_params_LAS, scores_LAS = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
 sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_LAS)
 
 if rfFlag:
-    best_params_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+    best_params_RSF, scores_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
     sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_RSF)
 
 if dataName == 'sarc021':
     # ----- VALIDATION -----
+    print('----------')
+    print('validation')
     df_imaging_val = df_imaging[df_imaging.USUBJID.isin(pipe_dict['val'][0])].reset_index()
     df_clinical_val = df_clinical[df_clinical.USUBJID.isin(pipe_dict['val'][0])].reset_index()
 
@@ -122,37 +138,67 @@ if dataName == 'sarc021':
     sa.LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_LAS)
     
     if rfFlag:
-        sa.RSF_bootstrap(testingSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_RSF)
+        sa.RSF_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_RSF)
+
+if np.logical_and(aggName == 'largest',inclMetsFlag):
+    aggName = 'largest+'
+
+# save results to file
+ms.add_column_to_csv('Results/'+dataName+'_CPH.csv', aggName, scores_CPH)
+ms.add_column_to_csv('Results/'+dataName+'_LAS.csv', aggName, scores_LAS)
+ms.add_column_to_csv('Results/'+dataName+'_RSF.csv', aggName, scores_RSF)
+
+
+
+# %% PLOTTING/SAVING DATA
+
+dataName = 'radcure'
+# univariate results for total volume of all ROIs and OS
+uni_dict = {
+            'radcure' : 0.632,
+            'crlm'    : 0.585,
+            'sarc021' : 0.607}
+
+all_data = pd.read_csv('Results/'+dataName+'_LAS.csv')
+#all_data = all_data[['largest','largest+','smallest','UWA','VWA','VWANLrg','primary','cosine','concat']]
+
+plt.axvline(x=uni_dict[dataName],linestyle='--',color='black')
+sns.violinplot(data=all_data,orient='h',palette='dark')
+plt.xlabel('Concordance Index (C-Index)')
+plt.ylabel('Method')
+# plt.savefig('testing.png',dpi=200,bbox_inches='tight')
+plt.show()
+
 
 
     #%% TESTING
 
-outcome = 'OS'
-numFeatures = 10
-df = reduced_crlm
+# outcome = 'OS'
+# numFeatures = 10
+# df = reduced_crlm
 
-dup = df.copy()
+# dup = df.copy()
 
-if 'E_'+outcome in dup.columns:
-    df_surv = dup.pop('E_'+outcome)
+# if 'E_'+outcome in dup.columns:
+#     df_surv = dup.pop('E_'+outcome)
     
-if 'T_'+outcome in dup.columns:
-    df_surv = pd.concat((df_surv,dup.pop('T_'+outcome)),axis=1)
+# if 'T_'+outcome in dup.columns:
+#     df_surv = pd.concat((df_surv,dup.pop('T_'+outcome)),axis=1)
 
-x = dup.copy().iloc[:,:]
-# print('x shape: ', x.shape)
+# x = dup.copy().iloc[:,:]
+# # print('x shape: ', x.shape)
 
-if len(df_surv.shape)>1:
-    y = Surv.from_arrays(df_surv['E_OS'],df_surv['T_OS'])
-    # print(y)
-else:
-    y = df_surv.values
-    # print(y)
+# if len(df_surv.shape)>1:
+#     y = Surv.from_arrays(df_surv['E_OS'],df_surv['T_OS'])
+#     # print(y)
+# else:
+#     y = df_surv.values
+#     # print(y)
 
-selected_features = mrmr_classif(x,y,numFeatures,relevance='rf')
-# print('selected features: ',selected_features)
+# selected_features = mrmr_classif(x,y,numFeatures,relevance='rf')
+# # print('selected features: ',selected_features)
 
-df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
+# df_Selected = pd.concat([df[selected_features],df_surv],axis=1)
 
 
 

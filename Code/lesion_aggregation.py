@@ -25,6 +25,7 @@ import numpy as np, pandas as pd
 from sklearn.preprocessing import StandardScaler
 from itertools import combinations
 from sklearn.metrics.pairwise import cosine_similarity as cos_sim
+import Code.feature_handling as fh
 
 
 def calcNumMets(radiomics):
@@ -237,6 +238,8 @@ def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag
     df_radiomics = df_radiomics.iloc[:,startColInd:]
     df_radiomics.insert(0, "USUBJID", radiomics.USUBJID[radiomics['USUBJID'].isin(valid_ids)], True)
 
+    # remove features that don't have a lot of variance across the whole dataset
+    df_radiomics = fh.varianceFilter(df_radiomics,returnColsFlag=False)
     
     # df_radiomics contains only those patients with 3+ lesions
     # for each patient, we need to isolate the features and scale them
@@ -273,7 +276,7 @@ def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag
         
     return df_CosineMetrics
 
-def interLesionRelationNetwork():
+def interLesionRelationNetwork(radiomics):
     
     '''
     Algorithm:
@@ -300,8 +303,10 @@ def interLesionRelationNetwork():
     
     '''
     
+    df_original = radiomics.iloc[:,np.where(radiomics.columns.str.find('original')==0)[0]]
+    df_original.insert(0,"USUBJID",radiomics.USUBJID)
     # cols = cols[np.where(cols.str.contains('original'))[0]]
     
-    return print('In progress...')
+    return df_original
 
 

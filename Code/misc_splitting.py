@@ -10,7 +10,7 @@ Last updated Feb 16 2024
 '''
 Miscellaneous helper and data-splitting functions.
 '''
-
+import os, csv
 import numpy as np, pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -165,3 +165,40 @@ def splitByScanDate(radiomics,train_test_ids,train_size = 0.8):
     split_index = int(train_size * len(df_sorted))
     
     return df_sorted.USUBJID.iloc[:split_index].values, df_sorted.USUBJID.iloc[split_index:].values
+
+
+def add_column_to_csv(csv_filename, column_name, column_data):
+    """
+    Add a new column to a CSV file or update an existing column.
+
+    Parameters:
+    - csv_filename (str): The path to the CSV file.
+    - column_name (str): The name of the column to add or update.
+    - column_data (list): The data to be added to the column.
+
+    """
+    # Check if CSV file exists
+    if not os.path.isfile(csv_filename):
+        # File doesn't exist, create it and add the column
+        with open(csv_filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([column_name])
+            # Transpose the list data to write as a column
+            writer.writerows(zip(column_data))
+    else:
+        # File exists, check if column exists
+        with open(csv_filename, 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            existing_columns = next(reader, [])  # Get the first row as a list
+            if column_name not in existing_columns:
+                # Column doesn't exist, add it
+                existing_columns.append(column_name)
+                rows = list(reader)  # Read remaining rows
+                # Transpose the list data to write as a column
+                rows = list(zip(*rows))
+                rows.insert(existing_columns.index(column_name), column_data)
+                rows = list(zip(*rows))
+                # Write data back to the file
+                with open(csv_filename, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerows([existing_columns] + rows)
