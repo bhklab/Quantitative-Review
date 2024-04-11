@@ -136,7 +136,7 @@ def CPH_bootstrap(df, name='agg/selection name', outcome='OS', trainFlag=True,pa
         
         print(name, 'CPH testing: {:.3f}'.format(score))
 
-        return None
+        return score
     
 
 def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param_grid=None):
@@ -208,7 +208,7 @@ def LASSO_COX_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True
         
         print(name, 'Lasso-Cox testing: {:.3f}'.format(score))
         
-        return None
+        return score
         
 
 def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param_grid=None):
@@ -298,4 +298,4 @@ def RSF_bootstrap(df,name='agg/selection name',outcome='OS',trainFlag=True,param
         
         print(name, 'RSF testing: {:.3f}'.format(score))
         
-        return None
+        return score

@@ -13,6 +13,7 @@ Miscellaneous helper and data-splitting functions.
 import os, csv
 import numpy as np, pandas as pd
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 def calcNumMets(radiomics):
     """
@@ -46,7 +47,9 @@ def printLesionReport(radiomics):
     instCodes = [p[-6:-3] for p in patients]
     institutions,numPatients = np.unique(instCodes,return_counts=True)
     
-    if 'RADCURE' in radiomics.USUBJID[0]:  # update for CRLM dataset
+    
+    
+    if 'SAR' not in radiomics.USUBJID[0]:  # update for CRLM dataset
         
         print('----------')
         print('No. of Institutions: 1')
@@ -71,7 +74,80 @@ def printLesionReport(radiomics):
         print('Range: [{}, {}]'.format(np.min(numLesions),np.max(numLesions)))
         print('IQR: [{}, {}]'.format(np.percentile(numLesions,25),np.percentile(numLesions,75)))
         
-def randomSplit(radiomics, clinical, train_size=0.8, tuneFlag=False):
+def distributionPlots(rad1,rad2,rad3,label1='TCIA - RADCURE',label2='TCIA - CRLM',label3='SARC021'):
+    """
+    Generates plots of the lesion distributions across datasets.
+    
+    Parameters:
+    - rad1 (DataFrame): PyRadiomics output file for dataset 1.
+    - rad2 (DataFrame): PyRadiomics output file for dataset 2.
+    - rad3 (DataFrame): PyRadiomics output file for dataset 3.
+    
+    Returns:
+    None
+    """
+    patients1,numLesions1 = np.unique(rad1.USUBJID,return_counts=True)
+    patients2,numLesions2 = np.unique(rad2.USUBJID,return_counts=True)
+    patients3,numLesions3 = np.unique(rad3.USUBJID,return_counts=True)
+    
+    barplotdata1 = np.array([np.sum(numLesions1>i) for i in range(np.max(numLesions1))])/len(patients1)*100.0
+    barplotdata2 = np.array([np.sum(numLesions2>i) for i in range(np.max(numLesions2))])/len(patients2)*100.0
+    barplotdata3 = np.array([np.sum(numLesions3>i) for i in range(np.max(numLesions3))])/len(patients3)*100.0
+    
+    plt.rcParams.update({'font.size': 22})
+    
+    plt.bar(range(1,max(numLesions1)+1),barplotdata1,color='b',alpha=0.5,label=label1)
+    plt.bar(range(1,max(numLesions2)+1),barplotdata2,color='g',alpha=0.5,label=label2)
+    plt.bar(range(1,max(numLesions3)+1),barplotdata3,color='r',alpha=0.5,label=label3)
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Patients (%)')
+    plt.legend()
+    plt.savefig('combo-distributions.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.bar(range(1,max(numLesions1)+1),barplotdata1,color='b',label=label1)
+    plt.xlim([0,max(numLesions1)+1])
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Patients (%)')
+    plt.savefig(label1+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.bar(range(1,max(numLesions2)+1),barplotdata2,color='g',label=label2)
+    plt.xlim([0,max(numLesions2)+1])
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Patients (%)')
+    plt.savefig(label2+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.bar(range(1,max(numLesions3)+1),barplotdata3,color='r',label=label3)
+    plt.xlim([0,max(numLesions3)+1])
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Patients (%)')
+    plt.savefig(label3+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.hist(numLesions1,bins=max(numLesions1),color='b',label=label1)
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Number of Patients')
+    plt.savefig(label1+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.hist(numLesions2,bins=max(numLesions2),color='g',label=label2)
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Number of Patients')
+    plt.savefig(label2+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    plt.hist(numLesions3,bins=max(numLesions3),color='r',label=label3)
+    plt.xlabel('Number of Lesions')
+    plt.ylabel('Number of Patients')
+    plt.savefig(label3+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.show()
+    
+    
+
+        
+def randomSplit(radiomics, clinical, train_size=0.8, stratFlag=True, tuneFlag=False):
     """
     Splits the data into train, tune, and test sets based on the given parameters.
 
@@ -79,6 +155,7 @@ def randomSplit(radiomics, clinical, train_size=0.8, tuneFlag=False):
     - radiomics (DataFrame): The radiomics data.
     - clinical (DataFrame): The clinical data.
     - train_size (float): The proportion of data to be used for training. Default is 0.8.
+    - stratFlag (bool): Flag indicating whether to stratify on the number of lesions. Default is True.
     - tuneFlag (bool): Flag indicating whether to include a tune set. Default is False.
 
     Returns:
@@ -89,7 +166,14 @@ def randomSplit(radiomics, clinical, train_size=0.8, tuneFlag=False):
     
     test_size = 1 - train_size
     ids_to_keep = np.intersect1d(clinical.USUBJID, np.unique(radiomics.USUBJID))
-    train_ids, test_ids = train_test_split(ids_to_keep, test_size=test_size, random_state=42)
+    
+    if stratFlag:
+        df_radiomics = radiomics[radiomics.USUBJID.isin(ids_to_keep)].reset_index()
+        numLesions = calcNumMets(df_radiomics)
+        print(numLesions)
+        train_ids, test_ids = train_test_split(ids_to_keep, test_size=test_size, stratify=numLesions, random_state=42)
+    else:
+        train_ids, test_ids = train_test_split(ids_to_keep, test_size=test_size, random_state=42)
 
     if tuneFlag:
         tune_size = 0.5

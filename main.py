@@ -16,6 +16,7 @@ os.chdir(os.path.dirname(__file__))
 import numpy as np, pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.lines import Line2D
 
 # custom functions
 import Code.misc_splitting as ms
@@ -35,27 +36,28 @@ sarc021_clinical = pd.read_csv('Data/SARC021/SARC021_clinical.csv')
 id_counts = sarc021_radiomics['USUBJID'].value_counts()
 valid_ids = id_counts[id_counts >= 2].index
 sarc021_radiomics = sarc021_radiomics[sarc021_radiomics['USUBJID'].isin(valid_ids)].reset_index()
+sarc021_clinical = sarc021_clinical[sarc021_clinical['USUBJID'].isin(valid_ids)].reset_index()
 
 # RADCURE
 radcure_radiomics = pd.read_csv('Data/RADCURE/RADCURE_radiomics.csv')
 radcure_clinical = pd.read_csv('Data/RADCURE/RADCURE_clinical.csv')
+# radcure_clinicalIso = radcure_clinical[np.unique(radcure_radiomics.USUBJID)[0]]
 
 # CRLM 
 crlm_radiomics = pd.read_csv('Data/TCIA-CRLM/CRLM_radiomics.csv')
 crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical.csv')
 
 
-del(id_counts,valid_ids)
-
 # %% ANALYSIS
 
-dataName = 'radcure'
+dataName = 'crlm'
 aggName = 'UWA'
 inclMetsFlag = False
 rfFlag = True
 uniFlag = False
 shuffleFlag = False
 numfeatures = 10
+minLesions = 2
 
 print('----------')
 print(dataName, ' - ', aggName)
@@ -69,6 +71,11 @@ data_dict = {
 
 df_imaging, df_clinical = data_dict[dataName][0],data_dict[dataName][1]
 
+id_counts = df_imaging['USUBJID'].value_counts()
+valid_ids = id_counts[id_counts >= minLesions].index
+df_imaging = df_imaging[df_imaging['USUBJID'].isin(valid_ids)].reset_index()
+df_clinical = df_clinical[df_clinical['USUBJID'].isin(valid_ids)].reset_index()
+
 if shuffleFlag:
     df_clinical['T_OS'] = df_clinical['T_OS'].sample(frac=1).reset_index(drop=True)
     df_clinical['E_OS'] = df_clinical['E_OS'].sample(frac=1).reset_index(drop=True)
@@ -81,7 +88,7 @@ if uniFlag:
 if dataName == 'sarc021':
     train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
 else:
-    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False)
+    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False,False)
     val = np.nan
 
 pipe_dict = {
@@ -144,34 +151,72 @@ if np.logical_and(aggName == 'largest',inclMetsFlag):
     aggName = 'largest+'
 
 # save results to file
-ms.add_column_to_csv('Results/'+dataName+'_CPH.csv', aggName, scores_CPH)
-ms.add_column_to_csv('Results/'+dataName+'_LAS.csv', aggName, scores_LAS)
-ms.add_column_to_csv('Results/'+dataName+'_RSF.csv', aggName, scores_RSF)
+# ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_CPH.csv', aggName, scores_CPH)
+# ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_LAS.csv', aggName, scores_LAS)
+# ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_RSF.csv', aggName, scores_RSF)
 
 
 
 # %% PLOTTING/SAVING DATA
 
 dataName = 'radcure'
+modelName = 'CPH'
+numLesions = 1
 # univariate results for total volume of all ROIs and OS
 uni_dict = {
             'radcure' : 0.632,
             'crlm'    : 0.585,
             'sarc021' : 0.607}
 
-all_data = pd.read_csv('Results/'+dataName+'_LAS.csv')
-#all_data = all_data[['largest','largest+','smallest','UWA','VWA','VWANLrg','primary','cosine','concat']]
+# load data
+all_data = pd.read_csv('Results/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_training.csv')
+test_df = pd.read_csv('Results/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_testing.csv')
+
+if dataName != 'radcure':
+    all_data['primary'] = np.nan 
+    test_df['primary'] = np.nan
+if dataName != 'sarc021':
+    all_data['lung'] = np.nan 
+    test_df['lung'] = np.nan
+
+all_data = all_data[['largest','largest+','smallest','primary','lung','VWANLrg','concat','UWA','VWA','cosine']]
+all_data.columns = ['Largest','Largest+','Smallest','Primary','Lung','VWA N-largest','Concatenation','UWA','VWA','Cosine Similarity']
+test_df = test_df[['largest','largest+','smallest','primary','lung','VWANLrg','concat','UWA','VWA','cosine']]
+test_df.columns = ['Largest','Largest+','Smallest','Primary','Lung','VWA N-largest','Concatenation','UWA','VWA','Cosine Similarity']
+
+# plotting params
+my_pal = ['#4daf4a','#4daf4a','#4daf4a','#4daf4a','#4daf4a','#ff7f00','#ff7f00','#377eb8','#377eb8','#377eb8']
+plt.rcParams.update({'font.size': 18})
+plt.rcParams["font.family"] = "Avenir"
 
 plt.axvline(x=uni_dict[dataName],linestyle='--',color='black')
-sns.violinplot(data=all_data,orient='h',palette='dark')
+ax = sns.violinplot(data=all_data,orient='h',palette=my_pal)
+sns.stripplot(data=test_df,orient='h',edgecolor='black', linewidth=1, palette=['white'] * 4,ax=ax)
+
+# Modify the legend
+legend_elements = [Line2D([0], [0], linestyle='--', color='k', label='Total Volume'),
+                   Line2D([0], [0], marker='s', color='w', label='Lesion Selection', markeredgecolor='k',markerfacecolor='#4daf4a', markersize=10,),
+                   Line2D([0], [0], marker='s', color='w', label='Information from Select Lesions', markeredgecolor='k',markerfacecolor='#ff7f00', markersize=10),
+                   Line2D([0], [0], marker='s', color='w', label='Information from All Lesions', markeredgecolor='k',markerfacecolor='#377eb8', markersize=10),
+                   Line2D([0], [0], marker='o', color='w', label='Testing Data', markeredgecolor='k',markerfacecolor='w', markersize=8)]
+
+plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left',fontsize=14)
+
 plt.xlabel('Concordance Index (C-Index)')
+plt.xlim([0.35,1])
 plt.ylabel('Method')
-# plt.savefig('testing.png',dpi=200,bbox_inches='tight')
+# plt.title(dataName)
+plt.savefig('Results/Figures/'+dataName+'_min'+str(numLesions)+'_'+modelName+'.png',dpi=300,bbox_inches='tight')
 plt.show()
 
+# %%
 
+# from scipy.stats import tukey_hsd as tukey
+# res = tukey(all_data.iloc[:,0],all_data.iloc[:,1],all_data.iloc[:,2],all_data.iloc[:,3],
+#       all_data.iloc[:,4],all_data.iloc[:,5],all_data.iloc[:,6],all_data.iloc[:,7],
+#       all_data.iloc[:,8],all_data.iloc[:,9])
 
-    #%% TESTING
+#%% TESTING
 
 # outcome = 'OS'
 # numFeatures = 10
@@ -425,41 +470,3 @@ plt.show()
 # CPH_bootstrap(smallest_top40_fp, sub=df_200_700)
 # CPH_bootstrap(smallest_top40_fp, sub=df_700)
 
-
-
-# %% 
-
-# def featureSelection(df,numFeatures=10,numMetsFlag=False,volFlag=False,scaleFlag=False):
-    
-#     if numMetsFlag:
-#         numFeatures -= 1
-#         solutions = mrmr.mrmr_ensemble_survival(features=df.iloc[:,2:-2],
-#                                                 targets=df.iloc[:,-2:],
-#                                                 solution_length=numFeatures)[0]
-#         df_Selected = df.copy()[solutions[0]+["NumMets","T_OS","E_OS"]]
-        
-#     else:
-#         solutions = mrmr.mrmr_ensemble_survival(features=df.iloc[:,1:-2],
-#                                             targets=df.iloc[:,-2:],
-#                                             solution_length=numFeatures)[0]
-#         df_Selected = df.copy()[solutions[0]+["T_OS","E_OS"]]
-      
-#     if volFlag and df.columns.isin(['original_shape_VoxelVolume']).any():
-#         numFeatures -= 1
-#         solutions = mrmr.mrmr_ensemble_survival(features=df.iloc[:,2:-2],
-#                                                 targets=df.iloc[:,-2:],
-#                                                 solution_length=numFeatures)[0]
-#         df_Selected = df.copy()[solutions[0]+["original_shape_VoxelVolume","T_OS","E_OS"]]
-        
-#     else:
-#         solutions = mrmr.mrmr_ensemble_survival(features=df.iloc[:,1:-2],
-#                                             targets=df.iloc[:,-2:],
-#                                             solution_length=numFeatures)[0]
-#         df_Selected = df.copy()[solutions[0]+["T_OS","E_OS"]]
-    
-    
-#     if scaleFlag:
-#         scaledFeatures = StandardScaler().fit_transform(df_Selected.iloc[:,:-2])
-#         df_Selected.iloc[:,:-2] = scaledFeatures
-    
-#     return df_Selected
