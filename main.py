@@ -45,7 +45,7 @@ crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical2.csv')
 # %% ANALYSIS
 
 dataName = 'radcure'
-aggName = 'cosine'
+aggName = 'largest'
 inclMetsFlag = False
 rfFlag = False
 uniFlag = False
@@ -63,8 +63,18 @@ data_dict = {
                 'crlm'    : [crlm_radiomics,crlm_clinical]
         }
 
+# load the data
 df_imaging, df_clinical = data_dict[dataName][0],data_dict[dataName][1]
 
+# get IDs for training / testing / validation
+if dataName == 'sarc021':
+    train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
+else:
+    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,True,False)
+    val = np.nan
+
+
+# isolate patient with at least minLesions
 id_counts = df_imaging['USUBJID'].value_counts()
 valid_ids = id_counts[id_counts >= minLesions].index
 df_imaging = df_imaging[df_imaging['USUBJID'].isin(valid_ids)].reset_index()
@@ -79,11 +89,7 @@ if uniFlag:
     sa.univariate_CPH(df_imaging,df_clinical,mod_choice='total')
     sa.univariate_CPH(df_imaging,df_clinical,mod_choice='max')
 
-if dataName == 'sarc021':
-    train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
-else:
-    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,True,False)
-    val = np.nan
+
 
 pipe_dict = {
                 'train' : [train,True],

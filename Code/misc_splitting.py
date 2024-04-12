@@ -103,46 +103,46 @@ def distributionPlots(rad1,rad2,rad3,label1='TCIA - RADCURE',label2='TCIA - CRLM
     plt.xlabel('Number of Lesions')
     plt.ylabel('Patients (%)')
     plt.legend()
-    plt.savefig('combo-distributions.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/combo-distributions.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.bar(range(1,max(numLesions1)+1),barplotdata1,color='b',label=label1)
     plt.xlim([0,max(numLesions1)+1])
     plt.xlabel('Number of Lesions')
     plt.ylabel('Patients (%)')
-    plt.savefig(label1+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label1+'-distributions.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.bar(range(1,max(numLesions2)+1),barplotdata2,color='g',label=label2)
     plt.xlim([0,max(numLesions2)+1])
     plt.xlabel('Number of Lesions')
     plt.ylabel('Patients (%)')
-    plt.savefig(label2+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label2+'-distributions.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.bar(range(1,max(numLesions3)+1),barplotdata3,color='r',label=label3)
     plt.xlim([0,max(numLesions3)+1])
     plt.xlabel('Number of Lesions')
     plt.ylabel('Patients (%)')
-    plt.savefig(label3+'-distributions.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label3+'-distributions.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.hist(numLesions1,bins=max(numLesions1),color='b',label=label1)
     plt.xlabel('Number of Lesions')
     plt.ylabel('Number of Patients')
-    plt.savefig(label1+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label1+'-histogram.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.hist(numLesions2,bins=max(numLesions2),color='g',label=label2)
     plt.xlabel('Number of Lesions')
     plt.ylabel('Number of Patients')
-    plt.savefig(label2+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label2+'-histogram.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     plt.hist(numLesions3,bins=max(numLesions3),color='r',label=label3)
     plt.xlabel('Number of Lesions')
     plt.ylabel('Number of Patients')
-    plt.savefig(label3+'-histogram.png',dpi=300,bbox_inches='tight')
+    plt.savefig('Results/Figures/'+label3+'-histogram.png',dpi=300,bbox_inches='tight')
     plt.show()
     
     
@@ -182,7 +182,7 @@ def randomSplit(radiomics, clinical, train_size=0.8, stratFlag=True, tuneFlag=Fa
     else:
         return train_ids, test_ids
     
-def singleInstValidationSplit(radiomics, clinical, train_size=0.8):
+def singleInstValidationSplit(radiomics, clinical, train_size=0.8, stratFlag=True):
     """
     Splits the data into training, testing, and validation sets based on the institution code. Validation set is the largest single institution.
 
@@ -206,8 +206,15 @@ def singleInstValidationSplit(radiomics, clinical, train_size=0.8):
     largestSingleInst = institutions[np.where(numPatients==np.max(numPatients))]
 
     validation_ids = ids_to_keep[instCodes==largestSingleInst]
+    
+    remaining_ids = ids_to_keep[instCodes!=largestSingleInst]
 
-    train_ids,test_ids = train_test_split(ids_to_keep[instCodes!=largestSingleInst],test_size=test_size,random_state=42)
+    if stratFlag:
+        df_radiomics = radiomics[radiomics.USUBJID.isin(remaining_ids)].reset_index()
+        numLesions = calcNumMets(df_radiomics).NumMets.values<3
+        train_ids, test_ids = train_test_split(remaining_ids, test_size=test_size, stratify=numLesions, random_state=42)
+    else:
+        train_ids, test_ids = train_test_split(remaining_ids, test_size=test_size, random_state=42)
     
     return train_ids, test_ids, validation_ids
 
