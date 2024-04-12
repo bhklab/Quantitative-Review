@@ -95,6 +95,7 @@ def distributionPlots(rad1,rad2,rad3,label1='TCIA - RADCURE',label2='TCIA - CRLM
     barplotdata3 = np.array([np.sum(numLesions3>i) for i in range(np.max(numLesions3))])/len(patients3)*100.0
     
     plt.rcParams.update({'font.size': 25})
+    plt.rcParams["font.family"] = "Avenir"
     
     plt.bar(range(1,max(numLesions1)+1),barplotdata1,color='b',alpha=0.5,label=label1)
     plt.bar(range(1,max(numLesions2)+1),barplotdata2,color='g',alpha=0.5,label=label2)
