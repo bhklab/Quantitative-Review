@@ -32,32 +32,26 @@ import Code.survival_analysis as sa
 sarc021_radiomics = pd.read_csv('Data/SARC021/SARC021_radiomics.csv')
 sarc021_clinical = pd.read_csv('Data/SARC021/SARC021_clinical.csv')
 
-# optional ? -- look only at those patients with 2+ lesions contoured
-id_counts = sarc021_radiomics['USUBJID'].value_counts()
-valid_ids = id_counts[id_counts >= 2].index
-sarc021_radiomics = sarc021_radiomics[sarc021_radiomics['USUBJID'].isin(valid_ids)].reset_index()
-sarc021_clinical = sarc021_clinical[sarc021_clinical['USUBJID'].isin(valid_ids)].reset_index()
-
 # RADCURE
-radcure_radiomics = pd.read_csv('Data/RADCURE/RADCURE_radiomics.csv')
+radcure_radiomics = pd.read_csv('Data/RADCURE/RADCURE_radiomics3.csv')
 radcure_clinical = pd.read_csv('Data/RADCURE/RADCURE_clinical.csv')
 # radcure_clinicalIso = radcure_clinical[np.unique(radcure_radiomics.USUBJID)[0]]
 
 # CRLM 
-crlm_radiomics = pd.read_csv('Data/TCIA-CRLM/CRLM_radiomics.csv')
-crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical.csv')
+crlm_radiomics = pd.read_csv('Data/TCIA-CRLM/CRLM_radiomics2.csv')
+crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical2.csv')
 
 
 # %% ANALYSIS
 
-dataName = 'crlm'
-aggName = 'UWA'
+dataName = 'radcure'
+aggName = 'cosine'
 inclMetsFlag = False
-rfFlag = True
+rfFlag = False
 uniFlag = False
 shuffleFlag = False
 numfeatures = 10
-minLesions = 2
+minLesions = 7
 
 print('----------')
 print(dataName, ' - ', aggName)
@@ -88,7 +82,7 @@ if uniFlag:
 if dataName == 'sarc021':
     train,test,val = ms.singleInstValidationSplit(df_imaging,df_clinical,0.8)
 else:
-    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,False,False)
+    train,test = ms.randomSplit(df_imaging,df_clinical,0.8,True,False)
     val = np.nan
 
 pipe_dict = {
@@ -123,10 +117,10 @@ df_clinical_test = df_clinical[df_clinical.USUBJID.isin(pipe_dict['test'][0])].r
 testingSet = func_dict[aggName][0](df_imaging_test,df_clinical_test,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1)[trainingSet.columns]
 
 best_params_CPH, scores_CPH = sa.CPH_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_CPH)
+test_CPH = sa.CPH_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_CPH)
 
-best_params_LAS, scores_LAS = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
-sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_LAS)
+# best_params_LAS, scores_LAS = sa.LASSO_COX_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
+# sa.LASSO_COX_bootstrap(testingSet,aggName,'OS',pipe_dict['test'][1],param_grid=best_params_LAS)
 
 if rfFlag:
     best_params_RSF, scores_RSF = sa.RSF_bootstrap(trainingSet,aggName,'OS',pipe_dict['train'][1])
@@ -151,9 +145,12 @@ if np.logical_and(aggName == 'largest',inclMetsFlag):
     aggName = 'largest+'
 
 # save results to file
-# ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_CPH.csv', aggName, scores_CPH)
+# training
+ms.add_column_to_csv('Results/'+dataName+'_min'+str(minLesions)+'_CPH_training.csv', aggName, scores_CPH)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_LAS.csv', aggName, scores_LAS)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_RSF.csv', aggName, scores_RSF)
+# testing
+ms.add_column_to_csv('Results/'+dataName+'_min'+str(minLesions)+'_CPH_testing.csv', aggName, [test_CPH])
 
 
 
@@ -162,7 +159,7 @@ if np.logical_and(aggName == 'largest',inclMetsFlag):
 dataName = 'radcure'
 modelName = 'CPH'
 numLesions = 1
-# univariate results for total volume of all ROIs and OS
+# univariable results for total volume of all ROIs and OS
 uni_dict = {
             'radcure' : 0.632,
             'crlm'    : 0.585,
