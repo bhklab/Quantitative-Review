@@ -45,16 +45,17 @@ crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical2.csv')
 # %% ANALYSIS
 
 dataName = 'radcure'
-aggName = 'largest'
+aggName = 'concat'
 inclMetsFlag = False
 rfFlag = False
 uniFlag = False
 shuffleFlag = False
 numfeatures = 10
-minLesions = 7
+minLesions = 3
 
 print('----------')
 print(dataName, ' - ', aggName)
+print('Minimum Lesions: ',str(minLesions))
 print('----------')
 
 data_dict = {
@@ -88,8 +89,6 @@ if uniFlag:
     # print univariate results
     sa.univariate_CPH(df_imaging,df_clinical,mod_choice='total')
     sa.univariate_CPH(df_imaging,df_clinical,mod_choice='max')
-
-
 
 pipe_dict = {
                 'train' : [train,True],
@@ -142,7 +141,7 @@ if dataName == 'sarc021':
     validationSet = func_dict[aggName][0](df_imaging_val,df_clinical_val,scaleFlag=True,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1)[trainingSet.columns]
 
     sa.CPH_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_CPH)
-    sa.LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_LAS)
+    # sa.LASSO_COX_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_LAS)
     
     if rfFlag:
         sa.RSF_bootstrap(validationSet,aggName,'OS',pipe_dict['val'][1],param_grid=best_params_RSF)
@@ -152,19 +151,19 @@ if np.logical_and(aggName == 'largest',inclMetsFlag):
 
 # save results to file
 # training
-ms.add_column_to_csv('Results/'+dataName+'_min'+str(minLesions)+'_CPH_training.csv', aggName, scores_CPH)
+ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_training.csv', aggName, scores_CPH)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_LAS.csv', aggName, scores_LAS)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_RSF.csv', aggName, scores_RSF)
 # testing
-ms.add_column_to_csv('Results/'+dataName+'_min'+str(minLesions)+'_CPH_testing.csv', aggName, [test_CPH])
+ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_testing.csv', aggName, [test_CPH])
 
 
 
 # %% PLOTTING/SAVING DATA
 
-dataName = 'radcure'
+dataName = 'sarc021'
 modelName = 'CPH'
-numLesions = 1
+numLesions = 3
 # univariable results for total volume of all ROIs and OS
 uni_dict = {
             'radcure' : 0.632,
@@ -172,8 +171,8 @@ uni_dict = {
             'sarc021' : 0.607}
 
 # load data
-all_data = pd.read_csv('Results/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_training.csv')
-test_df = pd.read_csv('Results/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_testing.csv')
+all_data = pd.read_csv('Results/Spreadsheets/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_training.csv')
+test_df = pd.read_csv('Results/Spreadsheets/'+dataName+'_min'+str(numLesions)+'_'+modelName+'_testing.csv')
 
 if dataName != 'radcure':
     all_data['primary'] = np.nan 
