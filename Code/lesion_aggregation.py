@@ -236,11 +236,12 @@ def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag
     df_radiomics = radiomics[radiomics['USUBJID'].isin(valid_ids)]
     
     df_radiomics = df_radiomics.iloc[:,startColInd:]
-    df_radiomics.insert(0, "USUBJID", radiomics.USUBJID[radiomics['USUBJID'].isin(valid_ids)], True)
-
-    # remove features that don't have a lot of variance across the whole dataset
-    df_radiomics = fh.varianceFilter(df_radiomics,returnColsFlag=False)
     
+    # perform feature reduction
+    df_radiomics = fh.featureReduction(df_radiomics,scaleFlag=False)
+    df_radiomics.insert(0, "USUBJID", radiomics.USUBJID[radiomics['USUBJID'].isin(valid_ids)], True)
+    
+    df_radiomics = df_radiomics.groupby('USUBJID').apply(lambda x: x.sample(numLesions)).reset_index(drop=True)
     # df_radiomics contains only those patients with 3+ lesions
     # for each patient, we need to isolate the features and scale them
     # then for each lesion-lesion combination, we calculate cos_sim using the scaled features

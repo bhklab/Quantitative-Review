@@ -45,17 +45,19 @@ crlm_clinical = pd.read_csv('Data/TCIA-CRLM/CRLM_clinical2.csv')
 # %% ANALYSIS
 
 dataName = 'radcure'
-aggName = 'concat'
+aggName = 'cosine'
 inclMetsFlag = False
 rfFlag = False
 uniFlag = False
 shuffleFlag = False
 numfeatures = 10
-minLesions = 3
+minLesions = 10
+maxLesions = 100
 
 print('----------')
 print(dataName, ' - ', aggName)
 print('Minimum Lesions: ',str(minLesions))
+print('Maximum Lesions: ',str(maxLesions))
 print('----------')
 
 data_dict = {
@@ -77,9 +79,12 @@ else:
 
 # isolate patient with at least minLesions
 id_counts = df_imaging['USUBJID'].value_counts()
-valid_ids = id_counts[id_counts >= minLesions].index
+valid_ids = id_counts[np.logical_and(id_counts >= minLesions,id_counts <= maxLesions)].index
 df_imaging = df_imaging[df_imaging['USUBJID'].isin(valid_ids)].reset_index()
 df_clinical = df_clinical[df_clinical['USUBJID'].isin(valid_ids)].reset_index()
+
+print('Number of patients in subgroup: ',str(len(df_clinical.USUBJID)))
+print('----------')
 
 if shuffleFlag:
     df_clinical['T_OS'] = df_clinical['T_OS'].sample(frac=1).reset_index(drop=True)
@@ -113,7 +118,13 @@ df_imaging_train = df_imaging[df_imaging.USUBJID.isin(pipe_dict['train'][0])].re
 df_clinical_train = df_clinical[df_clinical.USUBJID.isin(pipe_dict['train'][0])].reset_index()
 
 print('feature selection')
-trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
+if aggName == 'concat':
+    trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numLesions=minLesions,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
+elif aggName == 'cosine':
+    trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numLesions=minLesions,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
+else:
+    trainingSet = func_dict[aggName][1](func_dict[aggName][0](df_imaging_train,df_clinical_train,numMetsFlag=inclMetsFlag).drop('USUBJID',axis=1))
+    
 print('----------')
 # ----- TESTING -----
 df_imaging_test = df_imaging[df_imaging.USUBJID.isin(pipe_dict['test'][0])].reset_index()
@@ -151,11 +162,11 @@ if np.logical_and(aggName == 'largest',inclMetsFlag):
 
 # save results to file
 # training
-ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_training.csv', aggName, scores_CPH)
+# ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_training.csv', aggName, scores_CPH)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_LAS.csv', aggName, scores_LAS)
 # ms.add_column_to_csv('Results/'+dataName+'_min'+str(numLesions)+'_RSF.csv', aggName, scores_RSF)
 # testing
-ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_testing.csv', aggName, [test_CPH])
+# ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_CPH_testing.csv', aggName, [test_CPH])
 
 
 
@@ -163,7 +174,7 @@ ms.add_column_to_csv('Results/Spreadsheets/'+dataName+'_min'+str(minLesions)+'_C
 
 dataName = 'sarc021'
 modelName = 'CPH'
-numLesions = 3
+numLesions = 2
 # univariable results for total volume of all ROIs and OS
 uni_dict = {
             'radcure' : 0.632,
@@ -180,6 +191,9 @@ if dataName != 'radcure':
 if dataName != 'sarc021':
     all_data['lung'] = np.nan 
     test_df['lung'] = np.nan
+if numLesions == 1:
+    all_data['cosine'] = np.nan
+    test_df['cosine'] = np.nan
 
 all_data = all_data[['largest','largest+','smallest','primary','lung','VWANLrg','concat','UWA','VWA','cosine']]
 all_data.columns = ['Largest','Largest+','Smallest','Primary','Lung','VWA N-largest','Concatenation','UWA','VWA','Cosine Similarity']
@@ -191,9 +205,9 @@ my_pal = ['#4daf4a','#4daf4a','#4daf4a','#4daf4a','#4daf4a','#ff7f00','#ff7f00',
 plt.rcParams.update({'font.size': 18})
 plt.rcParams["font.family"] = "Avenir"
 
-plt.axvline(x=uni_dict[dataName],linestyle='--',color='black')
+plt.axvline(x=uni_dict[dataName],linestyle='--',color='k')
 ax = sns.violinplot(data=all_data,orient='h',palette=my_pal)
-sns.stripplot(data=test_df,orient='h',edgecolor='black', linewidth=1, palette=['white'] * 4,ax=ax)
+sns.stripplot(data=test_df,orient='h',edgecolor='k', linewidth=1, palette=['white'] * 4,ax=ax)
 
 # Modify the legend
 legend_elements = [Line2D([0], [0], linestyle='--', color='k', label='Total Volume'),
