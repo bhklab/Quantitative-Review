@@ -26,6 +26,7 @@ from sklearn.preprocessing import StandardScaler
 from itertools import combinations
 from sklearn.metrics.pairwise import cosine_similarity as cos_sim
 import Code.feature_handling as fh
+import Code.lesion_selection as ls
 
 
 def calcNumMets(radiomics):
@@ -45,7 +46,7 @@ def calcNumMets(radiomics):
     
     return numMets
 
-def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     Calculate the unweighted average of radiomics features for each subject.
 
@@ -86,7 +87,7 @@ def calcUnweightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, nu
         
     return df_UnweightedAverage
 
-def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     Calculates the volume-weighted average of radiomics features for each subject.
 
@@ -130,7 +131,7 @@ def calcVolumeWeightedAverage(radiomics, clinical, outcome='OS', scaleFlag=False
         
     return df_WeightedAverage
 
-def calcVolumeWeightedAverageNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+def calcVolumeWeightedAverageNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=False):
     """
     Calculate the volume-weighted average of the n largest lesions for each subject.
 
@@ -146,11 +147,11 @@ def calcVolumeWeightedAverageNLargest(radiomics, clinical, numLesions=3, outcome
     - df_VolWeightNLargest (DataFrame): Volume-weighted average of the N-largest lesions and the specified outcome variable for each subject.
     """
     
-    id_counts = radiomics['USUBJID'].value_counts()
-    valid_ids = id_counts[id_counts >= numLesions].index
-    df_radiomics = radiomics[radiomics['USUBJID'].isin(valid_ids)]
+    # id_counts = radiomics['USUBJID'].value_counts()
+    # valid_ids = id_counts[id_counts >= numLesions].index
+    # df_radiomics = radiomics[radiomics['USUBJID'].isin(valid_ids)]
     
-    df_filtered = df_radiomics.groupby('USUBJID').apply(lambda group: group.nlargest(numLesions, 'original_shape_VoxelVolume')).reset_index(drop=True)
+    df_filtered = radiomics.groupby('USUBJID').apply(lambda group: group.nlargest(numLesions, 'original_shape_VoxelVolume')).reset_index(drop=True)
     
     df_VolWeightNLargest = calcVolumeWeightedAverage(df_filtered, clinical, numMetsFlag=False)
     
@@ -159,11 +160,11 @@ def calcVolumeWeightedAverageNLargest(radiomics, clinical, numLesions=3, outcome
         df_VolWeightNLargest.iloc[:,1:-2] = scaledFeatures
     
     if numMetsFlag:
-        df_VolWeightNLargest.insert(1, "NumMets", calcNumMets(df_radiomics).NumMets, True)
+        df_VolWeightNLargest.insert(1, "NumMets", calcNumMets(radiomics).NumMets, True)
         
     return df_VolWeightNLargest
 
-def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=False):
     """
     Concatenates the largest lesions from radiomics data with clinical data.
     
@@ -181,12 +182,12 @@ def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFl
     
     startColInd = np.where(radiomics.columns.str.find('original')==0)[0][0]
     
-    id_counts = radiomics['USUBJID'].value_counts()
-    valid_ids = id_counts[id_counts >= numLesions].index
-    df_radiomics = radiomics[radiomics['USUBJID'].isin(valid_ids)]
+    # id_counts = radiomics['USUBJID'].value_counts()
+    # valid_ids = id_counts[id_counts >= numLesions].index
+    # df_radiomics = radiomics[radiomics['USUBJID'].isin(valid_ids)]
     
-    df_radiomics = df_radiomics.iloc[:,startColInd:]
-    df_radiomics.insert(0, "USUBJID", radiomics.USUBJID[radiomics['USUBJID'].isin(valid_ids)], True)
+    df_radiomics = radiomics.iloc[:,startColInd:]
+    df_radiomics.insert(0, "USUBJID", radiomics.USUBJID)
     
     df_filtered = df_radiomics.groupby('USUBJID').apply(lambda group: group.nlargest(numLesions, 'original_shape_VoxelVolume')).reset_index(drop=True)
     df_Concatenated = df_filtered[df_filtered.groupby('USUBJID').cumcount() == 0].reset_index(drop=True)
@@ -201,9 +202,11 @@ def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFl
     
     # here, original_shape_VoxelVolume represents total volume for the N largest lesions
     # then, original_shape_VoxelVolume_Lesion1 represents the volume for Lesion1 and so on...
+    # if numLesions == 1:
+    #     df_Concatenated = df_Concatenated.drop('original_shape_VoxelVolume_Lesion1')
     df_Concatenated.insert(1,"original_shape_VoxelVolume",total_volume,True)    
     df_Concatenated = df_Concatenated.merge(clinical[['USUBJID','T_'+outcome,'E_'+outcome]],on='USUBJID').reset_index(drop=True)
-    
+
     if scaleFlag:
         scaledFeatures = StandardScaler().fit_transform(df_Concatenated.iloc[:,1:-2])
         df_Concatenated.iloc[:,1:-2] = scaledFeatures
@@ -211,9 +214,13 @@ def concatenateNLargest(radiomics, clinical, numLesions=3, outcome='OS', scaleFl
     if numMetsFlag:
         df_Concatenated.insert(1,"NumMets",calcNumMets(df_radiomics).NumMets,True)
     
-    return df_Concatenated
+    if numLesions == 1:
+        return ls.selectLargestLesion(radiomics,clinical,scaleFlag=True)
+    else: 
+        return df_Concatenated
+    # return df_Concatenated
 
-def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=True):
+def calcCosineMetrics(radiomics, clinical, numLesions=3, outcome='OS', scaleFlag=False, numMetsFlag=False):
     """
     Calculate cosine similarity metrics for radiomics data.
 
@@ -303,6 +310,7 @@ def interLesionRelationNetwork(radiomics):
     
     
     '''
+    feature_classes = ['firstorder','shape','glcm','glrlm','glszm','gldm']
     
     df_original = radiomics.iloc[:,np.where(radiomics.columns.str.find('original')==0)[0]]
     df_original.insert(0,"USUBJID",radiomics.USUBJID)

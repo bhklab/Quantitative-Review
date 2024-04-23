@@ -46,7 +46,7 @@ def calcNumMets(radiomics):
     return numMets
  
 # def selectPrimaryTumor (dataset-specific hypothesis)
-def selectPrimaryTumor(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def selectPrimaryTumor(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     RADCURE-SPECIFIC: selects primary tumors from radiomics data and merges it with the clinical outcome.
 
@@ -82,7 +82,7 @@ def selectPrimaryTumor(radiomics, clinical, outcome='OS', scaleFlag=False, numMe
         
     return df_Primary
 
-def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     Selects the smallest lesion based on radiomics data and merges it with the clinical outcome.
 
@@ -102,9 +102,8 @@ def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, num
     
     df_Smallest = radiomics.copy().iloc[:,startColInd:] 
     df_Smallest.insert(0, "USUBJID", radiomics.USUBJID, True)
-    df_Smallest = df_Smallest.groupby('USUBJID').min('original_shape_VoxelVolume').reset_index(drop=True)
-    df_Smallest.insert(0, "USUBJID", np.unique(radiomics.USUBJID), True)
-    
+    df_Smallest = df_Smallest.groupby('USUBJID').apply(lambda group: group.nsmallest(1, 'original_shape_VoxelVolume')).reset_index(drop=True)
+
     df_Smallest = df_Smallest.merge(clinical[['USUBJID','T_'+outcome,'E_'+outcome]],on='USUBJID').reset_index(drop=True)
     
     if scaleFlag:
@@ -119,7 +118,7 @@ def selectSmallestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, num
         
     return df_Smallest
         
-def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     Selects the largest lesion based on radiomics data and merges it with the clinical outcome.
 
@@ -139,9 +138,8 @@ def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numM
     
     df_Largest = radiomics.copy().iloc[:,startColInd:] 
     df_Largest.insert(0, "USUBJID", radiomics.USUBJID, True)
-    df_Largest = df_Largest.groupby('USUBJID').max('original_shape_VoxelVolume').reset_index(drop=True)
-    df_Largest.insert(0, "USUBJID", np.unique(radiomics.USUBJID), True)
-    
+    df_Largest = df_Largest.groupby('USUBJID').apply(lambda group: group.nlargest(1, 'original_shape_VoxelVolume')).reset_index(drop=True)
+
     df_Largest = df_Largest.merge(clinical[['USUBJID','T_'+outcome,'E_'+outcome]],on='USUBJID').reset_index(drop=True)
     
     if scaleFlag:
@@ -151,13 +149,13 @@ def selectLargestLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numM
     if numMetsFlag:
         df_Largest = calcNumMets(radiomics).merge(df_Largest,on='USUBJID').reset_index(drop=True)
         
-        if multipleFlag:
-            df_Largest = df_Largest.loc[df_Largest.NumMets>1,:]
-        
+    if numMetsFlag and multipleFlag:
+        df_Largest = df_Largest.loc[df_Largest.NumMets>1,:]
+    
     return df_Largest
 
 # def selectLargestLungLesion (sarcoma-specific hypothesis)
-def selectLargestLungLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=True, multipleFlag=False):
+def selectLargestLungLesion(radiomics, clinical, outcome='OS', scaleFlag=False, numMetsFlag=False, multipleFlag=False):
     """
     SARCOMA-SPECIFIC: selects the largest lung lesion from the radiomics data and merges it with the clinical outcome.
     
