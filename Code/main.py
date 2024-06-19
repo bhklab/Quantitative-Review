@@ -26,33 +26,33 @@ import Code.survival_analysis as sa
 
 # %% QUANTITATIVE STUFF FOR RESULTS / DISCUSSION
 
-from scipy.stats import ks_2samp
+# from scipy.stats import ks_2samp
 
-data1 = 'sarc021'
-data2 = 'sarc021'
-num1 = 2
-num2 = 3
+# data1 = 'sarc021'
+# data2 = 'sarc021'
+# num1 = 2
+# num2 = 3
 
-file1 = data1+'_min'+str(num1)+'_CPH_training.csv'
-file2 = data2+'_min'+str(num2)+'_CPH_training.csv'
+# file1 = data1+'_min'+str(num1)+'_CPH_training.csv'
+# file2 = data2+'_min'+str(num2)+'_CPH_training.csv'
 
-df1 = pd.read_csv('Results/Spreadsheets/'+file1)
-df2 = pd.read_csv('Results/Spreadsheets/'+file2)
+# df1 = pd.read_csv('Results/Spreadsheets/'+file1)
+# df2 = pd.read_csv('Results/Spreadsheets/'+file2)
 
-pvals = []
-med1 = []
-med2 = []
+# pvals = []
+# med1 = []
+# med2 = []
 
-for c in df1.columns:
+# for c in df1.columns:
     
-    pvals.append(ks_2samp(df1[c],df2[c]).pvalue)
-    med1.append(df1[c].median())
-    med2.append(df2[c].median())
+#     pvals.append(ks_2samp(df1[c],df2[c]).pvalue)
+#     med1.append(df1[c].median())
+#     med2.append(df2[c].median())
 
-pvals
-# %%
-np.min(np.array(med2)-np.array(med1))
-np.array(med2)-np.array(med1)
+# pvals
+# # %%
+# np.min(np.array(med2)-np.array(med1))
+# np.array(med2)-np.array(med1)
 
 # %% DATA LOADING
 
