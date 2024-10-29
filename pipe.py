@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.lines import Line2D
 from scipy.stats import ks_2samp
-
+# %%
 # custom functions
 import Code.misc_splitting as ms
 import Code.lesion_selection as ls
@@ -212,6 +212,65 @@ for dat in dataName:
         plt.ylabel('Method')
         plt.title(dat+' - '+str(num)+('+ lesions'))
         plt.savefig('Results/Figures/'+dat+'_min'+str(num)+'_CPH.png',dpi=300,bbox_inches='tight')
+        plt.show()
+
+# %% SELECTIVE PLOTTING FOR SLIDES
+
+dataName = ['radcure','sarc021','crlm']
+numLesions = [1,2,3]
+
+# univariable results for total volume of all ROIs and OS
+uni_dict = {
+            'radcure' : [0.626,0.632,0.636],
+            'crlm'    : [0.589,0.585,0.588],
+            'sarc021' : [0.609,0.607,0.569]}
+
+for dat in dataName:
+    for num in numLesions:
+        # load data
+        all_data = pd.read_csv('Results/Spreadsheets/'+dat+'_min'+str(num)+'_CPH_training.csv')
+        test_df = pd.read_csv('Results/Spreadsheets/'+dat+'_min'+str(num)+'_CPH_testing.csv')
+
+        if dat != 'radcure':
+            all_data['primary'] = np.nan 
+            test_df['primary'] = np.nan
+        if dat != 'sarc021':
+            all_data['lung'] = np.nan 
+            test_df['lung'] = np.nan
+        if num == 1:
+            all_data['cosine'] = np.nan
+            test_df['cosine'] = np.nan
+
+        all_data = all_data[['largest','concat','VWA']]
+        all_data.columns = ['Largest','Concatenation','Volume-Weighted\n Average']
+        test_df = test_df[['largest','concat','VWA']]
+        test_df.columns = ['Largest','Concatenation','Volume-Weighted\n Average']
+
+        # plotting params
+        my_pal = ['#4daf4a','#ff7f00','#377eb8']
+        plt.rcParams.update({'font.size': 18})
+        plt.rcParams["font.family"] = "Avenir"
+        plt.figure(figsize=(7, 3))
+        plt.axvline(x=uni_dict[dat][num-1],linestyle='--',color='k')
+        plt.axvline(x=0.5,linestyle='--',color='lightgray')
+        ax = sns.violinplot(data=all_data,orient='h',palette=my_pal)
+        sns.stripplot(data=test_df,orient='h',edgecolor='k', linewidth=1, palette=['white'] * 4,ax=ax)
+        
+        # Modify the legend
+        legend_elements = [Line2D([0], [0], linestyle='--', color='lightgrey', label='Random'),
+                           Line2D([0], [0], linestyle='--', color='k', label='Total Volume'),
+                           Line2D([0], [0], marker='s', color='w', label='Lesion Selection', markeredgecolor='k',markerfacecolor='#4daf4a', markersize=10,),
+                           Line2D([0], [0], marker='s', color='w', label='Information from Select Lesions', markeredgecolor='k',markerfacecolor='#ff7f00', markersize=10),
+                           Line2D([0], [0], marker='s', color='w', label='Information from All Lesions', markeredgecolor='k',markerfacecolor='#377eb8', markersize=10),
+                           Line2D([0], [0], marker='o', color='w', label='Testing Data', markeredgecolor='k',markerfacecolor='w', markersize=8)]
+        
+        plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left',fontsize=14)
+        
+        plt.xlabel('Concordance Index (C-Index)')
+        plt.xlim([0.35,1])
+        plt.ylabel('Method')
+        plt.title(dat+' - '+str(num)+('+ lesions'))
+        plt.savefig('Results/Figures/MOD'+dat+'_min'+str(num)+'_CPH.png',dpi=300,bbox_inches='tight')
         plt.show()
 
 
